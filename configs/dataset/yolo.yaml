@@ -1,0 +1,25 @@
+#yolo specific dataset config file 
+name: yolo
+
+# YOLO format dataset structure
+data:
+  train: data/thermal/train/images
+  val: data/thermal/val/images
+  test: data/thermal/test/images
+  names: ['person']
+
+# Image processing
+image_size: 640
+augmentation:
+  hsv_h: 0.015  # HSV-Hue augmentation
+  hsv_s: 0.7    # HSV-Saturation augmentation
+  hsv_v: 0.4    # HSV-Value augmentation
+  degrees: 0.0  # Rotation (+/- deg)
+  translate: 0.1  # Translation (+/- fraction)
+  scale: 0.5    # Scale (+/- gain)
+  shear: 0.0    # Shear (+/- deg)
+  perspective: 0.0  # Perspective (+/- fraction)
+  flipud: 0.0   # Probability of flip up-down
+  fliplr: 0.5   # Probability of flip left-right
+  mosaic: 1.0   # Probability of mosaic
+  mixup: 0.0    # Probability of mixup 

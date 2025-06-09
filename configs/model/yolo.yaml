@@ -1,0 +1,83 @@
+#full yolo config file with all hyperparameters set to default
+
+name: yolo
+
+model:
+  type: yolo
+  version: v8n 
+  pretrained: true
+  num_classes: 1  
+  img_size: 640
+  batch_size: 16
+  epochs: 50
+  device: ${device}
+
+data:
+  format: yolo 
+  train: data/thermal/train/images
+  val: data/thermal/val/images
+  test: data/thermal/test/images
+  names: ['person'] 
+
+training:
+  # Optimizer settings
+  learning_rate: 0.001
+  weight_decay: 0.0005
+  momentum: 0.937
+  optimizer: Adam  # Options: SGD, Adam, AdamW, RMSProp
+  
+  # Learning rate scheduler
+  lr_scheduler: cosine  # Options: linear, cosine, step, plateau
+  warmup_epochs: 3
+  warmup_momentum: 0.8
+  warmup_bias_lr: 0.1
+  
+  # Loss weights
+  box: 7.5  # Box loss gain
+  cls: 0.5  # Class loss gain
+  dfl: 1.5  # Distribution focal loss gain
+  pose: 12.0  # Pose loss gain
+  kobj: 1.0  # Keypoint obj loss gain
+  
+  # Regularization
+  label_smoothing: 0.0
+  nbs: 64  # Nominal batch size
+  overlap_mask: true
+  mask_ratio: 4
+  dropout: 0.0
+  
+  # Augmentation
+  hsv_h: 0.015  # HSV-Hue augmentation
+  hsv_s: 0.7    # HSV-Saturation augmentation
+  hsv_v: 0.4    # HSV-Value augmentation
+  degrees: 0.0  # Rotation (+/- deg)
+  translate: 0.1  # Translation (+/- fraction)
+  scale: 0.5    # Scale (+/- gain)
+  shear: 0.0    # Shear (+/- deg)
+  perspective: 0.0  # Perspective (+/- fraction)
+  flipud: 0.0   # Probability of flip up-down
+  fliplr: 0.5   # Probability of flip left-right
+  mosaic: 1.0   # Probability of mosaic
+  mixup: 0.0    # Probability of mixup
+  
+  # Training settings
+  val: true  # Validate training results
+  plots: true  # Save plots for train/val
+  save: true  # Save best model
+  save_period: 10  # Save checkpoint every x epochs
+  cache: false  # Cache images in memory
+  image_weights: false  # Use weighted image selection for training
+  single_cls: true  # Train as single-class dataset
+  rect: false  # Rectangular training
+  cos_lr: false  # Cosine learning rate scheduler
+  close_mosaic: 10  # Disable mosaic augmentation for final 10 epochs
+  
+  # Validation settings
+  conf_thres: 0.001  # Confidence threshold
+  iou_thres: 0.6  # NMS IoU threshold
+  max_det: 300  # Maximum detections per image
+  
+  # Logging
+  verbose: true  # Print verbose output
+  seed: 0  # Global training seed
+  deterministic: true  # Deterministic training 

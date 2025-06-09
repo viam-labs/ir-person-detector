@@ -1,0 +1,32 @@
+defaults:
+  - model: custom_detector  #custom_detector, efficientnet, faster_rcnn, ssdlite
+  - dataset: flir
+  - _self_
+
+# Experiment settings
+experiment:
+  name: ${model.name}_${dataset.name}
+  seed: 42
+  device: ${device}
+
+# Training parameters
+training:
+  batch_size: 32
+  num_epochs: 50
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  early_stopping_patience: 5
+
+# Dataset parameters
+dataset:
+  train_path: ${oc.env:FLIR_DATASET_PATH}/images_thermal_train
+  val_path: ${oc.env:FLIR_DATASET_PATH}/images_thermal_val
+  test_path: ${oc.env:FLIR_DATASET_PATH}/images_thermal_test
+  image_size: [640, 512]  # [width, height]
+  num_workers: 4
+
+# Logging
+logging:
+  save_dir: outputs/${experiment.name}
+  log_interval: 10
+  save_interval: 5 

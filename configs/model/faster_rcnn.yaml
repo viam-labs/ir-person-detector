@@ -1,0 +1,18 @@
+name: faster_rcnn
+
+model:
+  type: faster_rcnn
+  backbone: resnet50
+  pretrained: true
+  num_classes: 2  # Background + Person
+  min_size: 640
+  max_size: 512
+  box_score_thresh: 0.05
+  box_nms_thresh: 0.5
+  box_detections_per_img: 100
+
+loss:
+  rpn_box_loss: smooth_l1
+  rpn_cls_loss: cross_entropy
+  box_loss: smooth_l1
+  cls_loss: cross_entropy 
