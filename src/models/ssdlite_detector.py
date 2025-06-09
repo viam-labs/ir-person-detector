@@ -4,26 +4,18 @@ import torchvision
 from torchvision.models.detection import ssdlite320_mobilenet_v3_large
 from torchvision.models.detection import SSDLite320_MobileNet_V3_Large_Weights
 
-def get_ssdlite_model(cfg):
+def get_ssdlite_model(cfg): #using config from hydra
     """
-    Create and configure SSD Lite model from torchvision
-    Args:
-        cfg: Configuration dictionary containing model parameters
-    Returns:
-        model: Configured SSD Lite model
-        criterion: Loss function
-        optimizer: Optimizer
-        scheduler: Learning rate scheduler
+    ssd lite model from torchvision
     """
     # Load pretrained model
     weights = SSDLite320_MobileNet_V3_Large_Weights.DEFAULT
     model = ssdlite320_mobilenet_v3_large(weights=weights)
     
     # Modify for single class (person)
-    num_classes = 2  # Background + Person
+    num_classes = 1 # Background + Person
     in_channels = 256  # Number of input channels for the classifier
     
-    # Replace the classifier with a new one for our number of classes
     model.head.classifier = torchvision.models.detection.ssd.SSDClassificationHead(
         in_channels=in_channels,
         num_anchors=model.anchor_generator.num_anchors_per_location(),

@@ -1,18 +1,23 @@
 name: faster_rcnn
 
 model:
-  type: faster_rcnn
-  backbone: resnet50
+  name: faster_rcnn
+  device: cuda
   pretrained: true
   num_classes: 1  # Single class for person detection
-  min_size: 640
-  max_size: 512
-  box_score_thresh: 0.05
-  box_nms_thresh: 0.5
-  box_detections_per_img: 100
+  backbone: resnet50_fpn_v2
+
+training:
+  batch_size: 8  # Smaller batch size due to memory requirements
+  learning_rate: 0.0001
+  weight_decay: 0.0005
+  num_epochs: 50
+  early_stopping_patience: 5
+  num_workers: 4
+  pin_memory: true
 
 loss:
-  rpn_box_loss: smooth_l1
-  rpn_cls_loss: cross_entropy
-  box_loss: smooth_l1
-  cls_loss: cross_entropy 
+  rpn_box_loss_weight: 1.0
+  rpn_cls_loss_weight: 1.0
+  box_loss_weight: 1.0
+  cls_loss_weight: 1.0 
