@@ -1,30 +1,50 @@
 import torch
 import torch.nn as nn
 import torchvision
-from torchvision.models.detection import ssdlite320_mobilenet_v3_large
-from torchvision.models.detection import SSDLite320_MobileNet_V3_Large_Weights
+from torchvision.models.detection import ssdlite320_mobilenet_v3_large, SSDLite320_MobileNet_V3_Large_Weights
+import hydra
+from omegaconf import DictConfig
 
-def get_ssdlite_model(cfg): #using config from hydra
-    """
-    ssd lite model from torchvision
-    """
-    # Load pretrained model
-    weights = SSDLite320_MobileNet_V3_Large_Weights.DEFAULT
-    model = ssdlite320_mobilenet_v3_large(weights=weights)
+class SSDLiteDetector(nn.Module):
+    def __init__(self, cfg: DictConfig):
+        super(SSDLiteDetector, self).__init__()
+        
+        # Load pretrained model with default weights
+        weights = SSDLite320_MobileNet_V3_Large_Weights.DEFAULT
+        self.model = ssdlite320_mobilenet_v3_large(weights=weights)
+        
+        # Replace the classifier for single-class detection
+        in_channels = self.model.head.classifier.module_list[0].in_channels
+        self.model.head.classifier = torchvision.models.detection.ssd.SSDClassificationHead(
+            in_channels=in_channels,
+            num_anchors=self.model.anchor_generator.num_anchors_per_location(),
+            num_classes=cfg.model.num_classes + 1  # +1 for background
+        )
+        
+        # Store the transforms for preprocessing
+        self.transforms = weights.transforms()
     
-    # Modify for single class (person)
-    num_classes = 1 # Background + Person
-    in_channels = 256  # Number of input channels for the classifier
+    def forward(self, images, targets=None):
+        if self.training and targets is None:
+            raise ValueError("In training mode, targets should be passed")
+        
+        # Apply transforms
+        images = [self.transforms(img) for img in images]
+        
+        # Forward pass
+        if self.training:
+            return self.model(images, targets)
+        else:
+            return self.model(images)
+
+@hydra.main(config_path="../../configs", config_name="config")
+def main(cfg: DictConfig):
+    device = torch.device(cfg.model.device if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
     
-    model.head.classifier = torchvision.models.detection.ssd.SSDClassificationHead(
-        in_channels=in_channels,
-        num_anchors=model.anchor_generator.num_anchors_per_location(),
-        num_classes=num_classes
-    )
-    
-    # Move model to device
-    device = torch.device(cfg.model.device)
-    model = model.to(device)
+    # Create model
+    model = SSDLiteDetector(cfg).to(device)
+    print("Model created and moved to device")
     
     # Create optimizer
     optimizer = torch.optim.AdamW(
@@ -42,39 +62,25 @@ def get_ssdlite_model(cfg): #using config from hydra
         verbose=True
     )
     
-    return model, optimizer, scheduler
-
-if __name__ == "__main__":
-    # Test the model
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # Test with dummy input
+    dummy_input = [torch.randn(cfg.model.input_channels, 640, 512).to(device)]
+    dummy_target = [{
+        'boxes': torch.tensor([[100, 100, 200, 200]], dtype=torch.float32).to(device),
+        'labels': torch.tensor([1], dtype=torch.int64).to(device)
+    }]
     
-    # Create dummy config
-    class DummyConfig:
-        def __init__(self):
-            self.model = type('obj', (object,), {
-                'device': device
-            })
-            self.training = type('obj', (object,), {
-                'learning_rate': 0.001,
-                'weight_decay': 0.0001,
-                'early_stopping_patience': 5
-            })
-    
-    cfg = DummyConfig()
-    
-    # Create model
-    model, optimizer, scheduler = get_ssdlite_model(cfg)
-    
-    # Create dummy input
-    dummy_input = torch.randn(1, 3, 320, 320).to(device)
-    
-    # Forward pass
+    # Test forward pass
     model.train()
-    predictions = model([dummy_input])
+    output = model(dummy_input, dummy_target)
+    print("\nTraining mode output:", output)
     
-    print(f"Input shape: {dummy_input.shape}")
-    print(f"Predictions: {predictions}")
+    model.eval()
+    output = model(dummy_input)
+    print("\nEvaluation mode output:", output)
     
     # Print model summary
     print("\nModel Summary:")
-    print(model) 
+    print(model)
+
+if __name__ == "__main__":
+    main() 

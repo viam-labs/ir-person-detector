@@ -1,8 +1,11 @@
+name: ssdlite
+
 model:
   name: ssdlite
   device: cuda
   pretrained: true
-  num_classes: 1  # Single class for person detection 
+  num_classes: 1  # Single class for person detection
+  input_channels: 1  # Grayscale
   image_size: [640, 512]  # Matching FLIR dataset dimensions
   backbone: mobilenet_v3_large
   anchor_generator:
@@ -11,10 +14,9 @@ model:
     strides: [[16, 32, 64, 128, 256, 512]]
 
 training:
-  batch_size: 16
+  batch_size: 32
   learning_rate: 0.001
   weight_decay: 0.0001
-  momentum: 0.9
   num_epochs: 50
   early_stopping_patience: 5
   early_stopping_min_delta: 0.001
