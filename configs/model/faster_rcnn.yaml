@@ -4,7 +4,7 @@ model:
   type: faster_rcnn
   backbone: resnet50
   pretrained: true
-  num_classes: 2  # Background + Person
+  num_classes: 1  # Single class for person detection
   min_size: 640
   max_size: 512
   box_score_thresh: 0.05

@@ -9,6 +9,19 @@ experiment:
   seed: 42
   device: ${device}
 
+# Model parameters
+model:
+  device: cuda
+  input_channels: 1  # Grayscale
+  output_size: 5  # 4 for bbox + 1 for class
+  backbone:
+    channels: [32, 64, 128]
+    kernel_size: 3
+    padding: 1
+  detector:
+    hidden_size: 512
+    dropout: 0.5
+
 # Training parameters
 training:
   batch_size: 32
@@ -16,14 +29,18 @@ training:
   learning_rate: 0.001
   weight_decay: 0.0001
   early_stopping_patience: 5
+  num_workers: 4
+  pin_memory: true
 
 # Dataset parameters
-dataset:
-  train_path: ${oc.env:FLIR_DATASET_PATH}/images_thermal_train
-  val_path: ${oc.env:FLIR_DATASET_PATH}/images_thermal_val
-  test_path: ${oc.env:FLIR_DATASET_PATH}/images_thermal_test
+data:
+  train_annotations: ${oc.env:FLIR_DATASET_PATH}/images_thermal_train/coco.json
+  train_images: ${oc.env:FLIR_DATASET_PATH}/images_thermal_train
+  val_annotations: ${oc.env:FLIR_DATASET_PATH}/images_thermal_val/coco.json
+  val_images: ${oc.env:FLIR_DATASET_PATH}/images_thermal_val
+  test_annotations: ${oc.env:FLIR_DATASET_PATH}/images_thermal_test/coco.json
+  test_images: ${oc.env:FLIR_DATASET_PATH}/images_thermal_test
   image_size: [640, 512]  # [width, height]
-  num_workers: 4
 
 # Logging
 logging:

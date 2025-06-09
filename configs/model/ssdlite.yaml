@@ -2,8 +2,8 @@ model:
   name: ssdlite
   device: cuda
   pretrained: true
-  num_classes: 2  # Background + Person
-  image_size: 320  # SSD Lite 320x320 input size
+  num_classes: 1  # Single class for person detection 
+  image_size: [640, 512]  # Matching FLIR dataset dimensions
   backbone: mobilenet_v3_large
   anchor_generator:
     sizes: [[30, 60, 111, 162, 213, 264, 315]]

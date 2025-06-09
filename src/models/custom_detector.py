@@ -7,38 +7,46 @@ import json
 import os
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
+import hydra
+from omegaconf import DictConfig
 
 class ThermalDetector(nn.Module):
-    def __init__(self):
+    def __init__(self, cfg: DictConfig):
         super(ThermalDetector, self).__init__()
         
+        # Get configuration values
+        backbone_channels = cfg.model.backbone.channels
+        kernel_size = cfg.model.backbone.kernel_size
+        padding = cfg.model.backbone.padding
+        hidden_size = cfg.model.detector.hidden_size
+        dropout = cfg.model.detector.dropout
+        input_channels = cfg.model.input_channels
+        output_size = cfg.model.output_size
+        
         # CNN backbone
-        self.features = nn.Sequential(
-            # First conv block
-            nn.Conv2d(1, 32, kernel_size=3, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(), #applying relu activation
-            nn.MaxPool2d(2),
-            
-            # Second conv block
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            
-            # Third conv block
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-        )
+        layers = []
+        in_channels = input_channels
+        for out_channels in backbone_channels:
+            layers.extend([
+                nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=padding),
+                nn.BatchNorm2d(out_channels),
+                nn.ReLU(),
+                nn.MaxPool2d(2)
+            ])
+            in_channels = out_channels
+        
+        self.features = nn.Sequential(*layers)
+        
+        # Calculate the size of flattened features
+        # Assuming input size of 640x512, after 3 maxpool layers (2x2) it becomes 80x64
+        flattened_size = backbone_channels[-1] * 80 * 64
         
         # Detection head
         self.detector = nn.Sequential(
-            nn.Linear(128 * 80 * 64, 512),  # Adjust based on your input size
+            nn.Linear(flattened_size, hidden_size),
             nn.ReLU(),
-            nn.Dropout(0.5),
-            nn.Linear(512, 5)  # 4 for bbox (x, y, w, h) + 1 for class
+            nn.Dropout(dropout),
+            nn.Linear(hidden_size, output_size)  # 4 for bbox + 1 for class
         )
         
     def forward(self, x):
@@ -179,29 +187,55 @@ def train_model(model, train_loader, criterion, optimizer, device, num_epochs=10
         print(f"Average Classification Loss: {epoch_cls_loss:.4f}")
         print("=" * 50)
 
-if __name__ == "__main__":
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+@hydra.main(config_path="../../configs", config_name="config")
+def main(cfg: DictConfig):
+    device = torch.device(cfg.model.device if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
     # Create model
-    model = ThermalDetector().to(device)
+    model = ThermalDetector(cfg).to(device)
     print("Model created and moved to device")
     
     # Create dataset and dataloader
     dataset = FLIRDataset(
-        json_file='/Users/isha.yerramilli-rao/FLIR_ADAS_v2/images_thermal_train/coco.json',
-        thermal_dir='/Users/isha.yerramilli-rao/FLIR_ADAS_v2/images_thermal_train'
+        json_file=cfg.data.train_annotations,
+        thermal_dir=cfg.data.train_images,
+        transform=transforms.Compose([
+            transforms.Resize((640, 512)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.5], std=[0.5])
+        ])
     )
     print(f"Dataset loaded with {len(dataset)} images")
     
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+    dataloader = DataLoader(
+        dataset, 
+        batch_size=cfg.training.batch_size, 
+        shuffle=True,
+        num_workers=cfg.training.num_workers,
+        pin_memory=cfg.training.pin_memory
+    )
     print(f"DataLoader created with batch size {dataloader.batch_size}")
     
     # Define loss function and optimizer
-    criterion = nn.MSELoss()  # For bbox regression
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    criterion = nn.MSELoss()
+    optimizer = torch.optim.Adam(
+        model.parameters(), 
+        lr=cfg.training.learning_rate,
+        weight_decay=cfg.training.weight_decay
+    )
     print("\nLoss function and optimizer initialized")
     
     # Train model
     print("\nStarting training...")
-    train_model(model, dataloader, criterion, optimizer, device) 
+    train_model(
+        model, 
+        dataloader, 
+        criterion, 
+        optimizer, 
+        device,
+        num_epochs=cfg.training.num_epochs
+    )
+
+if __name__ == "__main__":
+    main() 
