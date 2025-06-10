@@ -18,14 +18,8 @@ else:
     device = 'cpu'
     print("No GPU available, using CPU")
 
-@hydra.main(config_path="../configs", config_name="config", version_base=None) #setup from hydra to load config file 
+@hydra.main(config_path="../configs", config_name="config", version_base=None)
 def main(cfg: DictConfig):
-    # Get the script's directory
-    script_dir = Path(__file__).parent.parent
-    # Override config with YOLO-specific settings using absolute path
-    yolo_config_path = script_dir / "configs" / "model" / "yolo.yaml"
-    cfg = OmegaConf.merge(cfg, OmegaConf.load(str(yolo_config_path)))
-    
     # Setup logging
     log.info(f"Configuration: \n{OmegaConf.to_yaml(cfg)}")
     
@@ -36,36 +30,36 @@ def main(cfg: DictConfig):
     model = YOLO(f"yolov8{cfg.model.version}.pt")
     
     # Train the model
-    results = model.train( 
-        data=cfg.data,
+    results = model.train(
+        data=cfg.dataset.data.train,  # Path to training data is from the dataset config 
         epochs=cfg.model.epochs,
         imgsz=cfg.model.img_size,
         batch=cfg.model.batch_size,
         device=cfg.model.device,
-        workers=cfg.dataset.num_workers,
+        workers=cfg.training.num_workers,
         project=cfg.logging.save_dir,
         name=f"yolo_{cfg.model.version}",
         exist_ok=True,
         pretrained=cfg.model.pretrained,
-        optimizer="Adam",
-        lr0=cfg.training.learning_rate,
-        weight_decay=cfg.training.weight_decay,
-        momentum=cfg.training.momentum,
-        warmup_epochs=cfg.training.warmup_epochs,
-        warmup_momentum=cfg.training.warmup_momentum,
-        warmup_bias_lr=cfg.training.warmup_bias_lr,
-        box=cfg.training.box,
-        cls=cfg.training.cls,
-        dfl=cfg.training.dfl,
-        pose=cfg.training.pose,
-        kobj=cfg.training.kobj,
-        label_smoothing=cfg.training.label_smoothing,
-        nbs=cfg.training.nbs,
-        overlap_mask=cfg.training.overlap_mask,
-        mask_ratio=cfg.training.mask_ratio,
-        dropout=cfg.training.dropout,
-        val=cfg.training.val,
-        plots=cfg.training.plots
+        optimizer=cfg.model.optimizer,
+        lr0=cfg.model.learning_rate,
+        weight_decay=cfg.model.weight_decay,
+        momentum=cfg.model.momentum,
+        warmup_epochs=cfg.model.warmup_epochs,
+        warmup_momentum=cfg.model.warmup_momentum,
+        warmup_bias_lr=cfg.model.warmup_bias_lr,
+        box=cfg.model.box,
+        cls=cfg.model.cls,
+        dfl=cfg.model.dfl,
+        pose=cfg.model.pose,
+        kobj=cfg.model.kobj,
+        label_smoothing=cfg.model.label_smoothing,
+        nbs=cfg.model.nbs,
+        overlap_mask=cfg.model.overlap_mask,
+        mask_ratio=cfg.model.mask_ratio,
+        dropout=cfg.model.dropout,
+        val=cfg.model.val,
+        plots=cfg.model.plots
     )
     
     # Save the final model
