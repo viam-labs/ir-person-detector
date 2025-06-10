@@ -194,5 +194,6 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
-# Ignore data directory
-/data/
+# Ignore data directories
+/yolo_models/data/
+/data
