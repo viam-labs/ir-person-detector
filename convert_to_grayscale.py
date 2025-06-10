@@ -1,3 +1,4 @@
+#redundant code since each image is alrayd only 1 channel!11
 import torch
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
