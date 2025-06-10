@@ -41,12 +41,9 @@ class SSDLiteDetector(nn.Module):
 def main(cfg: DictConfig):
     device = torch.device(cfg.model.device if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
-    
-    # Create model
+
     model = SSDLiteDetector(cfg).to(device)
-    print("Model created and moved to device")
-    
-    # Create optimizer
+
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=cfg.training.learning_rate,

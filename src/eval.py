@@ -1,3 +1,4 @@
+#CHEKC THIS FILE FOR EVALUATION (UPDATE MIGHT BE REQUIRED)
 #FOR YOLO FORMAT 
 
 # import os
@@ -148,7 +149,7 @@ from PIL import Image
 import pickle
 
 with open("flir_coco_index.pkl", "wb") as f:
-    pickle.dump(coco, f)
+    pickle.dump(COCO, f)
 
 IMG_DIR = "/Users/isha.yerramilli-rao/FLIR_ADAS_v2/images_thermal_train"
 ANN_FILE = "/Users/isha.yerramilli-rao/FLIR_ADAS_v2/images_thermal_train/coco.json"
