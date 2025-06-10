@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 from ultralytics import YOLO
 import torch
+import os
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -17,10 +18,13 @@ else:
     device = 'cpu'
     print("No GPU available, using CPU")
 
-@hydra.main(config_path="../configs", config_name="config") #setup from hydra to load config file 
+@hydra.main(config_path="../configs", config_name="config", version_base=None) #setup from hydra to load config file 
 def main(cfg: DictConfig):
-    # Override config with YOLO-specific settings
-    cfg = OmegaConf.merge(cfg, OmegaConf.load("configs/model/yolo.yaml"))
+    # Get the script's directory
+    script_dir = Path(__file__).parent.parent
+    # Override config with YOLO-specific settings using absolute path
+    yolo_config_path = script_dir / "configs" / "model" / "yolo.yaml"
+    cfg = OmegaConf.merge(cfg, OmegaConf.load(str(yolo_config_path)))
     
     # Setup logging
     log.info(f"Configuration: \n{OmegaConf.to_yaml(cfg)}")
