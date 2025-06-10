@@ -1,7 +1,7 @@
-# training-person-detector
+# ir-person-detector
 
 
-This repository contains code for training and evaluating a person detection model using infrared video data from multiple streams. It is optimized for use on the Orin GPU.
+This repository contains code for training and evaluating a person detection model using infrared video data from multiple streams. It uses Hydra to format the configs and easily navigate between different models. It is optimized for use on the Orin GPU.
 
 - Training pipeline for person detection using PyTorch and Ultralytics YOLOv8
 - Utilities for:
