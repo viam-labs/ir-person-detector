@@ -11,6 +11,8 @@ data:
 
 # Image processing
 image_size: 640
+
+# Augmentation settings
 augmentation:
   hsv_h: 0.015  # HSV-Hue augmentation
   hsv_s: 0.7    # HSV-Saturation augmentation

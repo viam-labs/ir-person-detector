@@ -10,7 +10,7 @@ model:
   img_size: 640
   batch_size: 16
   epochs: 50
-  device: ${device}
+  device: cuda
   input_channels: 1  # Grayscale
   output_size: 5  # 4 for bbox + 1 for class
   backbone:
@@ -21,22 +21,14 @@ model:
     hidden_size: 512
     dropout: 0.5
 
-data:
-  format: yolo 
-  train: data/thermal/images/train_flir_images
-  val: data/thermal/images/val_flir_images
-  test: data/thermal/images/test_flir_images
-  names: ['person'] 
-
 training:
   # Optimizer settings
   learning_rate: 0.001
   weight_decay: 0.0005
   momentum: 0.937
-  optimizer: Adam  # Options: SGD, Adam, AdamW, RMSProp
-  
+  optimizer: Adam  
   # Learning rate scheduler
-  lr_scheduler: cosine  # Options: linear, cosine, step, plateau
+  lr_scheduler: cosine  
   warmup_epochs: 3
   warmup_momentum: 0.8
   warmup_bias_lr: 0.1
@@ -54,20 +46,6 @@ training:
   overlap_mask: true
   mask_ratio: 4
   dropout: 0.0
-  
-  # Augmentation
-  hsv_h: 0.015  # HSV-Hue augmentation
-  hsv_s: 0.7    # HSV-Saturation augmentation
-  hsv_v: 0.4    # HSV-Value augmentation
-  degrees: 0.0  # Rotation (+/- deg)
-  translate: 0.1  # Translation (+/- fraction)
-  scale: 0.5    # Scale (+/- gain)
-  shear: 0.0    # Shear (+/- deg)
-  perspective: 0.0  # Perspective (+/- fraction)
-  flipud: 0.0   # Probability of flip up-down
-  fliplr: 0.5   # Probability of flip left-right
-  mosaic: 1.0   # Probability of mosaic
-  mixup: 0.0    # Probability of mixup
   
   # Training settings
   val: true  # Validate training results

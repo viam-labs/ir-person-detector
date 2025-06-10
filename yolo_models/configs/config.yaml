@@ -1,16 +1,22 @@
 defaults:
-  - model: yolo  # or custom_detector, efficientnet, faster_rcnn, ssdlite
+  - model: yolo
   - dataset: yolo
   - _self_
 
 # Experiment settings
 experiment:
-  name: ${model.name}_${dataset.name}
+  name: yolo_ir_detector
   seed: 42
-  device: ${device}
+  device: cuda
 
-# Logging
+# Training settings
+training:
+  num_workers: 4
+  pin_memory: true
+
+# Logging settings
 logging:
   save_dir: outputs/${experiment.name}
   log_interval: 10
-  save_interval: 5 
+  save_interval: 5
+  
