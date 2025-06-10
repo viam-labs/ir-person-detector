@@ -11,6 +11,15 @@ model:
   batch_size: 16
   epochs: 50
   device: ${device}
+  input_channels: 1  # Grayscale
+  output_size: 5  # 4 for bbox + 1 for class
+  backbone:
+    channels: [32, 64, 128]
+    kernel_size: 3
+    padding: 1
+  detector:
+    hidden_size: 512
+    dropout: 0.5
 
 data:
   format: yolo 

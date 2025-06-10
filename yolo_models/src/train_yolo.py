@@ -27,43 +27,43 @@ def main(cfg: DictConfig):
     torch.manual_seed(cfg.experiment.seed)
     
     # Initialize YOLO model
-    model = YOLO(f"yolov8{cfg.model.version}.pt")
+    model = YOLO(f"yolov8{cfg.model.model.version}.pt")
     
     # Train the model
     results = model.train(
-        data=cfg.dataset.data.train,  # Path to training data is from the dataset config 
-        epochs=cfg.model.epochs,
-        imgsz=cfg.model.img_size,
-        batch=cfg.model.batch_size,
-        device=cfg.model.device,
+        data=cfg.dataset.data.train,  # Path to training data from dataset config
+        epochs=cfg.model.model.epochs,
+        imgsz=cfg.model.model.img_size,
+        batch=cfg.model.model.batch_size,
+        device=cfg.model.model.device,
         workers=cfg.training.num_workers,
         project=cfg.logging.save_dir,
-        name=f"yolo_{cfg.model.version}",
+        name=f"yolo_{cfg.model.model.version}",
         exist_ok=True,
-        pretrained=cfg.model.pretrained,
-        optimizer=cfg.model.optimizer,
-        lr0=cfg.model.learning_rate,
-        weight_decay=cfg.model.weight_decay,
-        momentum=cfg.model.momentum,
-        warmup_epochs=cfg.model.warmup_epochs,
-        warmup_momentum=cfg.model.warmup_momentum,
-        warmup_bias_lr=cfg.model.warmup_bias_lr,
-        box=cfg.model.box,
-        cls=cfg.model.cls,
-        dfl=cfg.model.dfl,
-        pose=cfg.model.pose,
-        kobj=cfg.model.kobj,
-        label_smoothing=cfg.model.label_smoothing,
-        nbs=cfg.model.nbs,
-        overlap_mask=cfg.model.overlap_mask,
-        mask_ratio=cfg.model.mask_ratio,
-        dropout=cfg.model.dropout,
-        val=cfg.model.val,
-        plots=cfg.model.plots
+        pretrained=cfg.model.model.pretrained,
+        optimizer=cfg.model.training.optimizer,
+        lr0=cfg.model.training.learning_rate,
+        weight_decay=cfg.model.training.weight_decay,
+        momentum=cfg.model.training.momentum,
+        warmup_epochs=cfg.model.training.warmup_epochs,
+        warmup_momentum=cfg.model.training.warmup_momentum,
+        warmup_bias_lr=cfg.model.training.warmup_bias_lr,
+        box=cfg.model.training.box,
+        cls=cfg.model.training.cls,
+        dfl=cfg.model.training.dfl,
+        pose=cfg.model.training.pose,
+        kobj=cfg.model.training.kobj,
+        label_smoothing=cfg.model.training.label_smoothing,
+        nbs=cfg.model.training.nbs,
+        overlap_mask=cfg.model.training.overlap_mask,
+        mask_ratio=cfg.model.training.mask_ratio,
+        dropout=cfg.model.training.dropout,
+        val=cfg.model.training.val,
+        plots=cfg.model.training.plots
     )
     
     # Save the final model
-    model.save(f"{cfg.logging.save_dir}/yolo_{cfg.model.version}/weights/best.pt")
+    model.save(f"{cfg.logging.save_dir}/yolo_{cfg.model.model.version}/weights/best.pt")
 
 if __name__ == "__main__":
     main()

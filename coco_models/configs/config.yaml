@@ -1,6 +1,6 @@
 defaults:
-  - model: yolo  # or custom_detector, efficientnet, faster_rcnn, ssdlite
-  - dataset: yolo
+  - model: custom_detector #efficientnet, faster_rcnn, ssdlite
+  - dataset: flir #make this config 
   - _self_
 
 # Experiment settings
@@ -32,15 +32,23 @@ training:
   num_workers: 4
   pin_memory: true
 
+#for COCO dataset config
 # Dataset parameters
+# data:
+#   train_annotations: ${oc.env:FLIR_DATASET_PATH}/images_thermal_train/coco.json
+#   train_images: ${oc.env:FLIR_DATASET_PATH}/images_thermal_train
+#   val_annotations: ${oc.env:FLIR_DATASET_PATH}/images_thermal_val/coco.json
+#   val_images: ${oc.env:FLIR_DATASET_PATH}/images_thermal_val
+#   test_annotations: ${oc.env:FLIR_DATASET_PATH}/images_thermal_test/coco.json
+#   test_images: ${oc.env:FLIR_DATASET_PATH}/images_thermal_test
+#   image_size: [640, 512]  # [width, height]
+
+#for YOLO dataset config
 data:
-  train_annotations: ${oc.env:FLIR_DATASET_PATH}/images_thermal_train/coco.json
-  train_images: ${oc.env:FLIR_DATASET_PATH}/images_thermal_train
-  val_annotations: ${oc.env:FLIR_DATASET_PATH}/images_thermal_val/coco.json
-  val_images: ${oc.env:FLIR_DATASET_PATH}/images_thermal_val
-  test_annotations: ${oc.env:FLIR_DATASET_PATH}/images_thermal_test/coco.json
-  test_images: ${oc.env:FLIR_DATASET_PATH}/images_thermal_test
-  image_size: [640, 512]  # [width, height]
+  train: data/thermal/images/train_flir_images
+  val: data/thermal/images/val_flir_images
+  test: data/thermal/images/test_flir_images
+  names: ['person']
 
 # Logging
 logging:
