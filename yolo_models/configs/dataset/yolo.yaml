@@ -4,9 +4,9 @@ name: yolo
 # YOLO format dataset structure
 data:
   format: yolo
-  train: yolo_models/data/thermal/images/train_flir_images
-  val: yolo_models/data/thermal/images/val_flir_images
-  test: yolo_models/data/thermal/images/test_flir_images
+  train: /Users/isha.yerramilli-rao/ir-person-detector/yolo_models/data/thermal/images/train_flir_images
+  val: /Users/isha.yerramilli-rao/ir-person-detector/yolo_models/data/thermal/images/val_flir_images
+  test: /Users/isha.yerramilli-rao/ir-person-detector/yolo_models/data/thermal/images/test_flir_images
   names: ['person']
 
 # Image processing
