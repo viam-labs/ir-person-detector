@@ -27,7 +27,7 @@ def main(cfg: DictConfig):
     torch.manual_seed(cfg.experiment.seed)
     
     # Initialize YOLO model
-    model = YOLO(f"yolov8{cfg.model.model.version}.pt")
+    model = YOLO(f"yolo{cfg.model.model.version}.pt")
     
     # Train the model
     results = model.train(
