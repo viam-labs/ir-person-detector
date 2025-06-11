@@ -1,13 +1,20 @@
 defaults:
-  - model: src/models/custom_detector #efficientnet, faster_rcnn, ssdlite
-  - dataset: src/datasets/flir_dataset #make this config 
+  - model: ${model}
+  - dataset: flir
   - _self_
+
+# for parallel runs training different models concurrently 
+hydra:
+  sweeper:
+    params:
+      model: choice(custom_detector,effnet,faster_rcnn,ssdlite)
+    max_batch_size: 3 
 
 # Experiment settings
 experiment:
-  name: ${model.name}_${dataset.name}
+  name: ${model}_${dataset}
   seed: 42
-  device: ${device}
+  device: cuda
 
 # Model parameters
 model:
@@ -24,7 +31,7 @@ model:
 
 # Training parameters
 training:
-  batch_size: 32
+  batch_size: 16  # Good balance between speed and memory
   num_epochs: 50
   learning_rate: 0.001
   weight_decay: 0.0005

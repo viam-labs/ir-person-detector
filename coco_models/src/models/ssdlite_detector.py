@@ -37,7 +37,7 @@ class SSDLiteDetector(nn.Module):
         else:
             return self.model(images)
 
-@hydra.main(config_path="../../configs", config_name="config")
+@hydra.main(config_path="../../configs", config_name="model/ssdlite", version_base=None)
 def main(cfg: DictConfig):
     device = torch.device(cfg.model.device if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")

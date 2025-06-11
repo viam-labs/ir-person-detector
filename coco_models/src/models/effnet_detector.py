@@ -67,7 +67,7 @@ class DetectionLoss(nn.Module):
         
         return total_loss, box_loss, cls_loss
 
-@hydra.main(config_path="../../configs", config_name="config")
+@hydra.main(config_path="../../configs", config_name="model/effnet", version_base=None)
 def main(cfg: DictConfig):
     device = torch.device(cfg.model.device if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
