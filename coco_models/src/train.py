@@ -8,25 +8,18 @@ from pathlib import Path
 from tqdm import tqdm
 import wandb
 
-# Import your model implementations
+# Import model implementations, dataset and logging 
 from models.custom_detector import ThermalDetector
 from models.faster_rcnn_detector import FasterRCNNDetector
 from models.effnet_detector import EfficientNetDetector
 from models.ssdlite_detector import SSDLiteDetector
-
-# Import dataset
 from datasets.flir_dataset import FLIRDataset
-
-# Import logging utilities
 from utils.logging import setup_logging
 
 log = logging.getLogger(__name__)
 
 def train_model(model, train_loader, val_loader, optimizer, device, cfg: DictConfig):
-    """
-    Train the model
-    """
-    # Initialize wandb if enabled
+    #using wandb for visualization of logging 
     if cfg.logging.wandb.enabled:
         wandb.init(
             project=cfg.logging.wandb.project,
@@ -124,7 +117,7 @@ def train_model(model, train_loader, val_loader, optimizer, device, cfg: DictCon
     if cfg.logging.wandb.enabled:
         wandb.finish()
 
-@hydra.main(config_path="configs", config_name="config")
+@hydra.main(config_path="../../configs", config_name="config", version_base=None)
 def main(cfg: DictConfig):
     # Setup logging
     setup_logging(cfg.logging)
@@ -152,7 +145,7 @@ def main(cfg: DictConfig):
     else:
         raise ValueError(f"Unknown model type: {cfg.model.name}")
     
-    # Get device from model 
+    # Get device from model (already added model to device in model's main)
     device = next(model.parameters()).device
     
     # Create datasets
