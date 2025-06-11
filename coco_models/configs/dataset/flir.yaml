@@ -1,0 +1,44 @@
+name: flir
+
+# Dataset paths
+data:
+  train_annotations: FLIR_ADAS_v2/images_thermal_train/coco.json
+  train_images: FLIR_ADAS_v2/images_thermal_train
+  val_annotations: FLIR_ADAS_v2/images_thermal_val/coco.json
+  val_images: FLIR_ADAS_v2/images_thermal_val
+  test_annotations: FLIR_ADAS_v2/images_thermal_test/coco.json
+  test_images: FLIR_ADAS_v2/images_thermal_test
+
+# Image configuration
+image:
+  size: [640, 640]  # resized images are all of equal size
+  channels: 1  # greyscale 
+  normalize: true
+  mean: [0.485]  # mean (from single channel images)
+  std: [0.229]   
+
+# Dataset specific parameters
+classes:
+  - person
+  - bicycle
+  - car
+  - motorcycle
+  - bus
+  - truck
+
+# Data augmentation
+augmentation:
+  enabled: true
+  horizontal_flip: true
+  vertical_flip: false
+  rotation: 15
+  brightness: 0.2
+  contrast: 0.2
+
+# COCO specific settings
+coco:
+  format: true
+  min_bbox_size: 8
+  max_bbox_size: 640
+  min_bbox_area: 64
+  max_bbox_area: 409600  

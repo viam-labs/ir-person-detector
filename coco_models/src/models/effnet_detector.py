@@ -6,55 +6,11 @@ import math
 import hydra
 from omegaconf import DictConfig
 
-def get_effnet_model(cfg):
-    """
-    Create and configure effnet b0 model 
-    Args:
-        cfg: hydra config containing model parameters
-    Returns:
-        model: effnet b0 model
-        criterion: loss
-        optimizer: adam
-        scheduler: reduce lr on plateau
-    """
-    # Load pretrained model
-    weights = EfficientNet_B0_Weights.DEFAULT
-    model = efficientnet_b0(weights=weights)
-        
-    # Modify for single class (person)
-    num_classes = 1 # Person
-    in_channels = 256  # Number of input channels for the classifier
-    
-    # Replace the classifier with a new one for our number of classes
-    model.classifier = nn.Linear(in_features=1280, out_features=num_classes)
-    
-    # Move model to device
-    device = torch.device(cfg.model.device)
-    model = model.to(device)
-    
-    # Create optimizer
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=cfg.training.learning_rate,
-        weight_decay=cfg.training.weight_decay
-    )
-    
-    # Create learning rate scheduler
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer,
-        mode='min',
-        factor=0.1,
-        patience=cfg.training.early_stopping_patience,
-        verbose=True
-    )
-    
-    return model, optimizer, scheduler
-
 class EfficientNetDetector(nn.Module):
     def __init__(self, cfg: DictConfig):
         super(EfficientNetDetector, self).__init__()
         
-        # Load pretrained model with default weights
+        # default weights loaded in 
         weights = EfficientNet_B0_Weights.DEFAULT
         self.backbone = efficientnet_b0(weights=weights)
         
@@ -118,7 +74,7 @@ def main(cfg: DictConfig):
     
     # Create model
     model = EfficientNetDetector(cfg).to(device)
-    print("Model created and moved to device")
+    print("effnet model created and moved to device")
     
     # Create loss function
     criterion = DetectionLoss(cfg)
@@ -138,6 +94,7 @@ def main(cfg: DictConfig):
         patience=cfg.training.early_stopping_patience,
         verbose=True
     )
+    print("\nLoss function and optimizer initialized for effnet detector")
     
     # Test with dummy input
     dummy_input = torch.randn(1, cfg.model.input_channels, 640, 512).to(device)

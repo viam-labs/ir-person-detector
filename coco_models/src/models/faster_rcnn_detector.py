@@ -37,7 +37,7 @@ def main(cfg: DictConfig):
     device = torch.device(cfg.model.device if torch.cuda.is_available() else 'cpu')
     
     model = FasterRCNNDetector(cfg).to(device)
-    print("Model created and moved to device")
+    print("fasterrcnn model created and moved to device")
     
     # Create optimizer
     optimizer = torch.optim.AdamW(
@@ -54,15 +54,7 @@ def main(cfg: DictConfig):
         patience=cfg.training.early_stopping_patience,
         verbose=True
     )
-    
-    # Test forward pass
-    model.train()
-    
-    model.eval()
-    
-    # Print model summary
-    print("\nModel Summary:")
-    print(model)
+    print("\nLoss function and optimizer initialized for fasterrcnn detector")
 
 if __name__ == "__main__":
     main() 
