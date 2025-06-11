@@ -43,6 +43,7 @@ def main(cfg: DictConfig):
     print(f"Using device: {device}")
 
     model = SSDLiteDetector(cfg).to(device)
+    print("ssdlite model created and moved to device")
 
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -58,26 +59,7 @@ def main(cfg: DictConfig):
         patience=cfg.training.early_stopping_patience,
         verbose=True
     )
-    
-    # Test with dummy input
-    dummy_input = [torch.randn(cfg.model.input_channels, 640, 512).to(device)]
-    dummy_target = [{
-        'boxes': torch.tensor([[100, 100, 200, 200]], dtype=torch.float32).to(device),
-        'labels': torch.tensor([1], dtype=torch.int64).to(device)
-    }]
-    
-    # Test forward pass
-    model.train()
-    output = model(dummy_input, dummy_target)
-    print("\nTraining mode output:", output)
-    
-    model.eval()
-    output = model(dummy_input)
-    print("\nEvaluation mode output:", output)
-    
-    # Print model summary
-    print("\nModel Summary:")
-    print(model)
+    print("\nLoss function and optimizer initialized for ssdlite detector")
 
 if __name__ == "__main__":
     main() 

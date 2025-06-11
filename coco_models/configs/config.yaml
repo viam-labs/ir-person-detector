@@ -1,6 +1,6 @@
 defaults:
-  - model: custom_detector #efficientnet, faster_rcnn, ssdlite
-  - dataset: flir #make this config 
+  - model: src/models/custom_detector #efficientnet, faster_rcnn, ssdlite
+  - dataset: src/datasets/flir_dataset #make this config 
   - _self_
 
 # Experiment settings
@@ -32,26 +32,35 @@ training:
   num_workers: 4
   pin_memory: true
 
-#for COCO dataset config
-# Dataset parameters
-# data:
-#   train_annotations: ${oc.env:FLIR_DATASET_PATH}/images_thermal_train/coco.json
-#   train_images: ${oc.env:FLIR_DATASET_PATH}/images_thermal_train
-#   val_annotations: ${oc.env:FLIR_DATASET_PATH}/images_thermal_val/coco.json
-#   val_images: ${oc.env:FLIR_DATASET_PATH}/images_thermal_val
-#   test_annotations: ${oc.env:FLIR_DATASET_PATH}/images_thermal_test/coco.json
-#   test_images: ${oc.env:FLIR_DATASET_PATH}/images_thermal_test
-#   image_size: [640, 512]  # [width, height]
-
-#for YOLO dataset config
 data:
-  train: data/thermal/images/train_flir_images
-  val: data/thermal/images/val_flir_images
-  test: data/thermal/images/test_flir_images
+  train: FLIR_ADAS_v2/images_thermal_train/data
+  val: FLIR_ADAS_v2/images_thermal_val/data
+  test: FLIR_ADAS_v2/images_thermal_test/data
   names: ['person']
 
 # Logging
 logging:
   save_dir: outputs/${experiment.name}
   log_interval: 10
-  save_interval: 5 
+  save_interval: 5
+  metrics:
+    - mAP
+    - precision
+    - recall
+    - loss
+    - learning_rate
+  tensorboard: true
+  wandb:
+    enabled: true
+    project: ir-person-detection
+    tags: ${model.name}
+  checkpoint:
+    save_best_only: true
+    monitor: val_mAP
+    mode: max
+  evaluation:
+    save_predictions: true
+    save_confusion_matrix: true
+    save_pr_curve: true
+    iou_threshold: 0.5
+    conf_threshold: 0.25 

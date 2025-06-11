@@ -65,128 +65,6 @@ class ThermalDetector(nn.Module):
         
         return bbox_pred, cls_pred
 
-class FLIRDataset(Dataset):
-    def __init__(self, json_file, thermal_dir, transform=None):
-        """
-        Args:
-            json_file (string): Path to the COCO format annotation file
-            thermal_dir (string): Directory with thermal images
-            transform (callable, optional): Optional transform to be applied on images
-        """
-        with open(json_file, 'r') as f:
-            self.annotations = json.load(f)
-        
-        self.thermal_dir = thermal_dir
-        self.transform = transform or transforms.Compose([
-            transforms.Resize((640, 512)),  # Original FLIR resolution
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5], std=[0.5])  # For thermal images
-        ])
-        
-        # Create image id to annotations mapping
-        self.img_to_anns = {}
-        for ann in self.annotations['annotations']:
-            img_id = ann['image_id']
-            if img_id not in self.img_to_anns:
-                self.img_to_anns[img_id] = []
-            self.img_to_anns[img_id].append(ann)
-        
-        # Get all image ids
-        self.image_ids = list(self.img_to_anns.keys())
-    
-    def __len__(self):
-        return len(self.image_ids)
-    
-    def __getitem__(self, idx):
-        # Get image id
-        img_id = self.image_ids[idx]
-        
-        # Find image info
-        img_info = next(img for img in self.annotations['images'] if img['id'] == img_id)
-        
-        # Load thermal image
-        img_path = os.path.join(self.thermal_dir, img_info['file_name'])
-        image = Image.open(img_path).convert('L')  # Convert to grayscale
-        
-        # Get annotations for this image
-        anns = self.img_to_anns[img_id]
-        
-        # Initialize targets
-        bbox_target = torch.zeros(4, dtype=torch.float32)  # [x, y, w, h]
-        cls_target = torch.zeros(1, dtype=torch.float32)   # 1 for person
-        
-        for ann in anns:
-            if ann['category_id'] == 1:  # Assuming 1 is person
-                bbox = ann['bbox']  # [x, y, w, h]
-                bbox_target = torch.tensor(bbox, dtype=torch.float32)
-                cls_target[0] = 1.0
-                break
-        
-        # Apply transformations
-        if self.transform:
-            image = self.transform(image)
-        
-        return image, bbox_target, cls_target
-
-def train_model(model, train_loader, criterion, optimizer, device, num_epochs=10):
-    print(f"\nStarting training on {device}")
-    print(f"Total epochs: {num_epochs}")
-    print(f"Total batches per epoch: {len(train_loader)}")
-    print(f"Batch size: {train_loader.batch_size}")
-    print(f"Total training samples: {len(train_loader.dataset)}\n")
-    
-    model.train()
-    for epoch in range(num_epochs):
-        running_loss = 0.0
-        running_bbox_loss = 0.0
-        running_cls_loss = 0.0
-        
-        print(f"\nEpoch {epoch+1}/{num_epochs}")
-        print("=" * 50)
-        
-        for batch_idx, (images, bboxes, classes) in enumerate(train_loader):
-            # Move data to device
-            images = images.to(device)
-            bboxes = bboxes.to(device)
-            classes = classes.to(device)
-            
-            # Zero the parameter gradients
-            optimizer.zero_grad()
-            
-            # Forward pass
-            bbox_pred, cls_pred = model(images)
-            
-            # Calculate loss
-            bbox_loss = criterion(bbox_pred, bboxes)
-            cls_loss = criterion(cls_pred, classes)
-            loss = bbox_loss + cls_loss
-            
-            # Backward pass and optimize
-            loss.backward()
-            optimizer.step()
-            
-            # Update running losses
-            running_loss += loss.item()
-            running_bbox_loss += bbox_loss.item()
-            running_cls_loss += cls_loss.item()
-            
-            # Print batch progress
-            if (batch_idx + 1) % 10 == 0:  # Print every 10 batches
-                print(f"Batch {batch_idx + 1}/{len(train_loader)} - "
-                      f"Loss: {loss.item():.4f} "
-                      f"(Bbox: {bbox_loss.item():.4f}, Cls: {cls_loss.item():.4f})")
-        
-        # Print epoch summary
-        epoch_loss = running_loss / len(train_loader)
-        epoch_bbox_loss = running_bbox_loss / len(train_loader)
-        epoch_cls_loss = running_cls_loss / len(train_loader)
-        
-        print(f"\nEpoch {epoch+1} Summary:")
-        print(f"Average Loss: {epoch_loss:.4f}")
-        print(f"Average Bbox Loss: {epoch_bbox_loss:.4f}")
-        print(f"Average Classification Loss: {epoch_cls_loss:.4f}")
-        print("=" * 50)
-
 @hydra.main(config_path="../../configs", config_name="config")
 def main(cfg: DictConfig):
     device = torch.device(cfg.model.device if torch.cuda.is_available() else 'cpu')
@@ -194,28 +72,7 @@ def main(cfg: DictConfig):
     
     # Create model
     model = ThermalDetector(cfg).to(device)
-    print("Model created and moved to device")
-    
-    # Create dataset and dataloader
-    dataset = FLIRDataset(
-        json_file=cfg.data.train_annotations,
-        thermal_dir=cfg.data.train_images,
-        transform=transforms.Compose([
-            transforms.Resize((640, 512)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5], std=[0.5])
-        ])
-    )
-    print(f"Dataset loaded with {len(dataset)} images")
-    
-    dataloader = DataLoader(
-        dataset, 
-        batch_size=cfg.training.batch_size, 
-        shuffle=True,
-        num_workers=cfg.training.num_workers,
-        pin_memory=cfg.training.pin_memory
-    )
-    print(f"DataLoader created with batch size {dataloader.batch_size}")
+    print("custom detector model created and moved to device")
     
     # Define loss function and optimizer
     criterion = nn.MSELoss()
@@ -224,18 +81,7 @@ def main(cfg: DictConfig):
         lr=cfg.training.learning_rate,
         weight_decay=cfg.training.weight_decay
     )
-    print("\nLoss function and optimizer initialized")
-    
-    # Train model
-    print("\nStarting training...")
-    train_model(
-        model, 
-        dataloader, 
-        criterion, 
-        optimizer, 
-        device,
-        num_epochs=cfg.training.num_epochs
-    )
+    print("\nLoss function and optimizer initialized for custom detector")
 
 if __name__ == "__main__":
     main() 

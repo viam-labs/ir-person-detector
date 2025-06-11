@@ -6,7 +6,7 @@ model:
   pretrained: true
   num_classes: 1  # Single class for person detection
   input_channels: 1  # Grayscale
-  image_size: [640, 512]  # Matching FLIR dataset dimensions
+  image_size: [640, 640]  
   backbone: mobilenet_v3_large
   anchor_generator:
     sizes: [[30, 60, 111, 162, 213, 264, 315]]
