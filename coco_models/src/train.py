@@ -117,7 +117,7 @@ def train_model(model, train_loader, val_loader, optimizer, device, cfg: DictCon
     if cfg.logging.wandb.enabled:
         wandb.finish()
 
-@hydra.main(config_path="../../configs", config_name="config", version_base=None)
+@hydra.main(config_path="../configs", config_name="config", version_base=None)
 def main(cfg: DictConfig):
     # Setup logging
     setup_logging(cfg.logging)
