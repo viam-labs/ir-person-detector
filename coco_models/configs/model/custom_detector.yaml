@@ -1,10 +1,17 @@
 name: custom_detector
 
 model:
-  name: custom
+  name: custom_detector
   device: cuda
   input_channels: 1  # Grayscale
-  num_classes: 1  # Single class for person detection
+  output_size: 5  # 4 for bbox + 1 for class
+  backbone:
+    channels: [32, 64, 128]
+    kernel_size: 3
+    padding: 1
+  detector:
+    hidden_size: 512
+    dropout: 0.5
 
 training:
   batch_size: 32

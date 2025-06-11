@@ -1,11 +1,11 @@
 name: effnet
 
 model:
-  name: efficientnet
+  name: effnet
   device: cuda
-  pretrained: true
-  num_classes: 1  # Single class for person detection
   input_channels: 1  # Grayscale
+  num_classes: 1  # Single class for person detection
+  pretrained: true
 
 training:
   batch_size: 32

@@ -8,6 +8,7 @@ data:
   val_images: FLIR_ADAS_v2/images_thermal_val
   test_annotations: FLIR_ADAS_v2/images_thermal_test/coco.json
   test_images: FLIR_ADAS_v2/images_thermal_test
+  names: ['person']
 
 # Image configuration
 image:
@@ -20,11 +21,6 @@ image:
 # Dataset specific parameters
 classes:
   - person
-  - bicycle
-  - car
-  - motorcycle
-  - bus
-  - truck
 
 # Data augmentation
 augmentation:
