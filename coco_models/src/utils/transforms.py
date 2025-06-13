@@ -54,7 +54,7 @@ class DetectionTransform:
             if t_name == 'resize':
                 size = params[0]
                 # resize with padding
-                image, resize_info = self.resize_with_padding(image, size)
+                image, resize_info = resize_with_padding(image, size)
                 
                 # Transform boxes 
                 if target is not None and 'boxes' in target:
