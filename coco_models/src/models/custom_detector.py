@@ -1,4 +1,3 @@
-#set up to work with the original flir dataset in COCO format
 import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
@@ -14,7 +13,7 @@ class ThermalDetector(nn.Module):
     def __init__(self, cfg: DictConfig):
         super(ThermalDetector, self).__init__()
         
-        # Get configuration values
+        # config vals
         backbone_channels = cfg.model.backbone.channels
         kernel_size = cfg.model.backbone.kernel_size
         padding = cfg.model.backbone.padding
@@ -22,8 +21,7 @@ class ThermalDetector(nn.Module):
         dropout = cfg.model.detector.dropout
         input_channels = cfg.model.input_channels
         output_size = cfg.model.output_size
-        
-        # Expected input size from config
+   
         self.expected_size = cfg.dataset.image.size
         
         # CNN backbone
@@ -39,8 +37,6 @@ class ThermalDetector(nn.Module):
         
         self.features = nn.Sequential(*layers)
         
-        # Calculate the size of flattened features
-        # Input size from config (e.g., 640x640)
         # After 3 MaxPool2d layers (2x2), size is reduced by factor of 8
         h, w = self.expected_size
         feature_h, feature_w = h // 8, w // 8
@@ -90,7 +86,7 @@ class ThermalDetector(nn.Module):
         # Process each image's targets
         for i in range(batch_size):
             boxes = targets['boxes'][i] 
-            # Create one-hot encoded class labels (assuming binary classification)
+            # binary classification, one hot encoding
             classes = torch.ones(boxes.shape[0], 1, device=device)
             
             all_boxes.append(boxes)
@@ -111,11 +107,11 @@ class ThermalDetector(nn.Module):
         bbox_pred = torch.cat(bbox_pred_repeated, dim=0)
         cls_pred = torch.cat(cls_pred_repeated, dim=0)
         
-        # Compute losses
+
         bbox_loss = self.bbox_criterion(bbox_pred, bbox_target)
         cls_loss = self.cls_criterion(cls_pred, cls_target)
         
-        # Total loss (equal weighting for now)
+        # Total loss (equal weighted for now)
         total_loss = bbox_loss + cls_loss
         
         return total_loss
@@ -123,20 +119,18 @@ class ThermalDetector(nn.Module):
 @hydra.main(config_path="../../configs", config_name="model/custom_detector", version_base=None)
 def main(cfg: DictConfig):
     device = torch.device(cfg.model.device if torch.cuda.is_available() else 'cpu')
-    print(f"Using device: {device}")
-    
-    # Create model
+    print(f"using: {device}")
+
     model = ThermalDetector(cfg).to(device)
     print("custom detector model created and moved to device")
     
-    # Define loss function and optimizer
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(
         model.parameters(), 
         lr=cfg.training.learning_rate,
         weight_decay=cfg.training.weight_decay
     )
-    print("\nLoss function and optimizer initialized for custom detector")
+    print("loss func and optimizer initialized for custom detector")
 
 if __name__ == "__main__":
     main() 
