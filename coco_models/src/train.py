@@ -20,7 +20,7 @@ from utils.transforms import build_transforms, custom_collate_fn
 log = logging.getLogger(__name__)
 
 def train_model(model, train_loader, val_loader, optimizer, device, cfg: DictConfig):
-    #using wandb for visualization of logging 
+    #using wandb for visualization of logging (not using right now)
     if cfg.logging.wandb.enabled:
         wandb.init(
             project=cfg.logging.wandb.project,
@@ -62,7 +62,7 @@ def train_model(model, train_loader, val_loader, optimizer, device, cfg: DictCon
             train_pbar.set_postfix({'loss': loss.item()})
             
             # Log to wandb
-            if cfg.logging.wandb.enabled and batch_idx % cfg.logging.log_interval == 0:
+            if cfg.logging.wandb.enabled and batch_idx % cfg.logging.log_interval == 0: #NOT USING ATM
                 wandb.log({
                     'train/loss': loss.item(),
                     'train/learning_rate': optimizer.param_groups[0]['lr']
@@ -141,7 +141,7 @@ def main(cfg: DictConfig):
     
     torch.manual_seed(cfg.experiment.seed)
     
-    # Create model based on configuration
+    # model created based on config
     if cfg.model.name == "custom_detector":
         model = ThermalDetector(cfg)
     elif cfg.model.name == "faster_rcnn":

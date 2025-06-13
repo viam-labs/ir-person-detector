@@ -197,4 +197,5 @@ cython_debug/
 # Ignore data directories
 /yolo_models/data/
 /data
-.DS_Store
+/FLIR_ADAS_v2/
+
