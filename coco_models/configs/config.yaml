@@ -9,7 +9,7 @@ hydra:
 
 
 defaults:
-  - model: custom_detector  # Default model, will be overridden by sweep
+  - model: custom_detector  
   - dataset: flir
   - _self_
 # Experiment settings

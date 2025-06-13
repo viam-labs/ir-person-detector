@@ -12,7 +12,7 @@ data:
 
 # Image configuration
 image:
-  size: [640, 640]  # images are already this size
+  size: [640, 640] 
   channels: 1  # greyscale 
   normalize: true
   mean: [0.485]  # mean (from single channel images)
@@ -22,9 +22,12 @@ image:
 classes:
   - person
 
-# Transform configuration to preprocess images to prevent overfitting
+#preprocess images to prevent overfitting
 transform:
   train:
+    - name: Resize
+      params:
+        size: [640, 640]
     - name: Normalize
       params:
         mean: [0.485]
@@ -32,11 +35,10 @@ transform:
     - name: RandomHorizontalFlip
       params:
         p: 0.5
-    - name: ColorJitter
-      params:
-        brightness: 0.2
-        contrast: 0.2
   val:
+    - name: Resize
+      params:
+        size: [640, 640]
     - name: Normalize
       params:
         mean: [0.485]
