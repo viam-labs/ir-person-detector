@@ -36,8 +36,7 @@ class ThermalDetector(nn.Module):
         
         self.features = nn.Sequential(*layers)
         
-        # Calculate the size of flattened features
-        # Input size of 640x640, after 3 maxpool layers (2x2) it becomes 80x80
+        # Input size of 640x640, after 3 maxpool layers (80x80)
         flattened_size = backbone_channels[-1] * 80 * 80
         
         # Detection head
@@ -47,6 +46,10 @@ class ThermalDetector(nn.Module):
             nn.Dropout(dropout),
             nn.Linear(hidden_size, output_size)  # 4 for bbox + 1 for class
         )
+        
+        # Loss functions
+        self.bbox_criterion = nn.MSELoss()
+        self.cls_criterion = nn.BCEWithLogitsLoss()
         
     def forward(self, x):
         # Extract features
@@ -63,6 +66,46 @@ class ThermalDetector(nn.Module):
         cls_pred = predictions[:, 4:]
         
         return bbox_pred, cls_pred
+    
+    def compute_loss(self, output, targets):
+        bbox_pred, cls_pred = output
+        batch_size = bbox_pred.shape[0]
+        device = bbox_pred.device
+        all_boxes = []
+        all_classes = []
+        
+        # Process each image's targets
+        for i in range(batch_size):
+            boxes = targets['boxes'][i] 
+            # Create one-hot encoded class labels (assuming binary classification)
+            classes = torch.ones(boxes.shape[0], 1, device=device)
+            
+            all_boxes.append(boxes)
+            all_classes.append(classes)
+        
+        # Concatenate all boxes and classes
+        bbox_target = torch.cat(all_boxes, dim=0)
+        cls_target = torch.cat(all_classes, dim=0)
+        
+        # Repeat predictions for each target box
+        bbox_pred_repeated = []
+        cls_pred_repeated = []
+        for i in range(batch_size):
+            num_boxes = targets['boxes'][i].shape[0]
+            bbox_pred_repeated.append(bbox_pred[i:i+1].repeat(num_boxes, 1)) 
+            cls_pred_repeated.append(cls_pred[i:i+1].repeat(num_boxes, 1))
+        
+        bbox_pred = torch.cat(bbox_pred_repeated, dim=0)
+        cls_pred = torch.cat(cls_pred_repeated, dim=0)
+        
+        # Compute losses
+        bbox_loss = self.bbox_criterion(bbox_pred, bbox_target)
+        cls_loss = self.cls_criterion(cls_pred, cls_target)
+        
+        # Total loss (equal weighting for now)
+        total_loss = bbox_loss + cls_loss
+        
+        return total_loss
 
 @hydra.main(config_path="../../configs", config_name="model/custom_detector", version_base=None)
 def main(cfg: DictConfig):
