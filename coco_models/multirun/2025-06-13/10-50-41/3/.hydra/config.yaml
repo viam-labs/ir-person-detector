@@ -1,0 +1,151 @@
+model:
+  name: ssdlite
+  model:
+    name: ssdlite
+    device: cuda
+    input_channels: 1
+    num_classes: 1
+    pretrained: true
+    image_size:
+    - 640
+    - 640
+    backbone: mobilenet_v3_large
+    strides:
+    - - 16
+      - 32
+      - 64
+      - 128
+      - 256
+      - 512
+  training:
+    batch_size: 32
+    learning_rate: 0.001
+    weight_decay: 0.0001
+    num_epochs: 50
+    early_stopping_patience: 5
+    num_workers: 4
+    pin_memory: true
+  augmentation:
+    enabled: true
+    horizontal_flip: true
+    vertical_flip: false
+    rotation: 15
+    brightness: 0.2
+    contrast: 0.2
+    saturation: 0.2
+    hue: 0.1
+    scale:
+    - 0.8
+    - 1.2
+    translate:
+    - 0.1
+    - 0.1
+  loss:
+    box_loss_weight: 1.0
+    cls_loss_weight: 1.0
+    smooth_l1_beta: 0.11
+    negative_mining_ratio: 3
+    negative_mining_threshold: 0.5
+  num_classes: 1
+  pretrained: true
+  confidence_threshold: 0.5
+  device: cuda
+  input_channels: 1
+  output_size: 5
+  backbone:
+    channels:
+    - 32
+    - 64
+    - 128
+    kernel_size: 3
+    padding: 1
+  detector:
+    hidden_size: 512
+    dropout: 0.5
+dataset:
+  name: flir
+  data:
+    train_annotations: FLIR_ADAS_v2/images_thermal_train/coco.json
+    train_images: FLIR_ADAS_v2/images_thermal_train
+    val_annotations: FLIR_ADAS_v2/images_thermal_val/coco.json
+    val_images: FLIR_ADAS_v2/images_thermal_val
+    test_annotations: FLIR_ADAS_v2/images_thermal_test/coco.json
+    test_images: FLIR_ADAS_v2/images_thermal_test
+    names:
+    - person
+  image:
+    size:
+    - 640
+    - 640
+    channels: 1
+    normalize: true
+    mean:
+    - 0.485
+    std:
+    - 0.229
+  classes:
+  - person
+  transform:
+    train:
+    - name: Normalize
+      params:
+        mean:
+        - 0.485
+        std:
+        - 0.229
+    - name: RandomHorizontalFlip
+      params:
+        p: 0.5
+    - name: ColorJitter
+      params:
+        brightness: 0.2
+        contrast: 0.2
+    val:
+    - name: Normalize
+      params:
+        mean:
+        - 0.485
+        std:
+        - 0.229
+  coco:
+    format: true
+    min_bbox_size: 8
+    max_bbox_size: 640
+    min_bbox_area: 64
+    max_bbox_area: 409600
+experiment:
+  name: run_1
+  seed: 42
+  device: cuda
+training:
+  batch_size: 8
+  num_epochs: 50
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  early_stopping_patience: 10
+  checkpoint_dir: checkpoints
+logging:
+  save_dir: outputs/${experiment.name}
+  log_interval: 10
+  save_interval: 5
+  metrics:
+  - mAP
+  - precision
+  - recall
+  - loss
+  - learning_rate
+  tensorboard: true
+  wandb:
+    enabled: true
+    project: ir-person-detection
+    tags: ${hydra:runtime.choices.model}
+  checkpoint:
+    save_best_only: true
+    monitor: val_mAP
+    mode: max
+  evaluation:
+    save_predictions: true
+    save_confusion_matrix: true
+    save_pr_curve: true
+    iou_threshold: 0.5
+    conf_threshold: 0.25
