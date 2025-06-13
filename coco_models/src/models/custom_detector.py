@@ -25,21 +25,20 @@ class ThermalDetector(nn.Module):
         
         # CNN backbone
         layers = []
-        in_channels = input_channels
         for out_channels in backbone_channels:
             layers.extend([
-                nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=padding),
+                nn.Conv2d(input_channels, out_channels, kernel_size=kernel_size, padding=padding),
                 nn.BatchNorm2d(out_channels),
                 nn.ReLU(),
                 nn.MaxPool2d(2)
             ])
-            in_channels = out_channels
+            input_channels = out_channels
         
         self.features = nn.Sequential(*layers)
         
         # Calculate the size of flattened features
-        # Assuming input size of 640x512, after 3 maxpool layers (2x2) it becomes 80x64
-        flattened_size = backbone_channels[-1] * 80 * 64
+        # Input size of 640x640, after 3 maxpool layers (2x2) it becomes 80x80
+        flattened_size = backbone_channels[-1] * 80 * 80
         
         # Detection head
         self.detector = nn.Sequential(

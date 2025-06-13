@@ -3,15 +3,12 @@ name: ssdlite
 model:
   name: ssdlite
   device: cuda
-  pretrained: true
-  num_classes: 1  # Single class for person detection
   input_channels: 1  # Grayscale
+  num_classes: 1  # Single class for person detection
+  pretrained: true
   image_size: [640, 640]  
   backbone: mobilenet_v3_large
-  anchor_generator:
-    sizes: [[30, 60, 111, 162, 213, 264, 315]]
-    aspect_ratios: [[2.0, 0.5]]
-    strides: [[16, 32, 64, 128, 256, 512]]
+  strides: [[16, 32, 64, 128, 256, 512]]
 
 training:
   batch_size: 32
@@ -19,12 +16,8 @@ training:
   weight_decay: 0.0001
   num_epochs: 50
   early_stopping_patience: 5
-  early_stopping_min_delta: 0.001
-  checkpoint_interval: 5
-  validation_interval: 1
   num_workers: 4
   pin_memory: true
-  mixed_precision: true
 
 augmentation:
   enabled: true

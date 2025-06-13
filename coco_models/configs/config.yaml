@@ -1,23 +1,28 @@
-defaults:
-  - model: ${model}
-  - dataset: flir
-  - _self_
-
-# for parallel runs training different models concurrently 
+# Sweep configuration for parallel runs
 hydra:
+  run:
+    dir: outputs
   sweeper:
     params:
       model: choice(custom_detector,effnet,faster_rcnn,ssdlite)
-    max_batch_size: 3 
+    max_batch_size: 4  # Number of parallel runs
 
+
+defaults:
+  - model: custom_detector  # Default model, will be overridden by sweep
+  - dataset: flir
+  - _self_
 # Experiment settings
 experiment:
-  name: ${model}_${dataset}
+  name: run_1
   seed: 42
   device: cuda
 
-# Model parameters
+# Model configuration
 model:
+  num_classes: 1
+  pretrained: true
+  confidence_threshold: 0.5
   device: cuda
   input_channels: 1  # Grayscale
   output_size: 5  # 4 for bbox + 1 for class
@@ -29,21 +34,14 @@ model:
     hidden_size: 512
     dropout: 0.5
 
-# Training parameters
+# Training configuration
 training:
-  batch_size: 16  # Good balance between speed and memory
+  batch_size: 8
   num_epochs: 50
   learning_rate: 0.001
-  weight_decay: 0.0005
-  early_stopping_patience: 5
-  num_workers: 4
-  pin_memory: true
-
-data:
-  train: FLIR_ADAS_v2/images_thermal_train/data
-  val: FLIR_ADAS_v2/images_thermal_val/data
-  test: FLIR_ADAS_v2/images_thermal_test/data
-  names: ['person']
+  weight_decay: 0.0001
+  early_stopping_patience: 10
+  checkpoint_dir: checkpoints
 
 # Logging
 logging:
@@ -60,7 +58,7 @@ logging:
   wandb:
     enabled: true
     project: ir-person-detection
-    tags: ${model.name}
+    tags: ${hydra:runtime.choices.model}
   checkpoint:
     save_best_only: true
     monitor: val_mAP
