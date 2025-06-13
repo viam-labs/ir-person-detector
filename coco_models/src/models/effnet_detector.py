@@ -97,14 +97,14 @@ def main(cfg: DictConfig):
     print("\nLoss function and optimizer initialized for effnet detector")
     
     # Test with dummy input
-    dummy_input = torch.randn(1, cfg.model.input_channels, 640, 512).to(device)
+    dummy_input = torch.randn(1, cfg.model.input_channels, 640, 640).to(device)
     bbox_pred, cls_pred = model(dummy_input)
     
     print(f"Input shape: {dummy_input.shape}")
     print(f"Bounding box predictions shape: {bbox_pred.shape}")
     print(f"Classification predictions shape: {cls_pred.shape}")
     
-    # Print model summary
+    # Print model summary using a dummy input
     print("\nModel Summary:")
     print(model)
 

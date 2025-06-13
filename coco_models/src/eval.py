@@ -21,7 +21,7 @@
 
 # IMAGE_DIR = "data/thermal/images/val_flir_images"
 # LABEL_DIR = "data/thermal/labels/val_flir_images"
-# IMG_SIZE = (640, 512)  # original FLIR resolution
+# IMG_SIZE = (640, 640)  # resized image resolution
 
 # #load YOLO labels
 # def load_yolo_labels(label_path, img_w, img_h):
@@ -222,3 +222,8 @@ coco_eval = COCOeval(coco, coco_pred, iouType="bbox")
 coco_eval.evaluate()
 coco_eval.accumulate()
 coco_eval.summarize()
+
+# Constants
+# IMG_SIZE = (640, 640) 
+BATCH_SIZE = 32
+NUM_WORKERS = 4

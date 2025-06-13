@@ -15,6 +15,7 @@ from models.effnet_detector import EfficientNetDetector
 from models.ssdlite_detector import SSDLiteDetector
 from datasets.flir_dataset import FLIRDataset
 from utils.logging import setup_logging
+from utils.transforms import build_transforms
 
 log = logging.getLogger(__name__)
 
@@ -127,15 +128,7 @@ def main(cfg: DictConfig):
     
     # Create model based on configuration
     if cfg.model.name == "custom_detector":
-        model = ThermalDetector(
-            input_channels=cfg.model.input_channels,
-            output_size=cfg.model.output_size,
-            backbone_channels=cfg.model.backbone.channels,
-            kernel_size=cfg.model.backbone.kernel_size,
-            padding=cfg.model.backbone.padding,
-            hidden_size=cfg.model.detector.hidden_size,
-            dropout=cfg.model.detector.dropout
-        )
+        model = ThermalDetector(cfg)
     elif cfg.model.name == "faster_rcnn":
         model = FasterRCNNDetector(cfg)
     elif cfg.model.name == "effnet":
@@ -148,17 +141,21 @@ def main(cfg: DictConfig):
     # Get device from model (already added model to device in model's main)
     device = next(model.parameters()).device
     
+    # Create transforms
+    train_transform = build_transforms(cfg, is_train=True)
+    val_transform = build_transforms(cfg, is_train=False)
+    
     # Create datasets
     train_dataset = FLIRDataset(
-        json_file=Path(cfg.data.train).parent / "coco.json",
-        thermal_dir=Path(cfg.data.train),
-        transform=cfg.dataset.transform
+        json_file=Path(cfg.dataset.data.train_annotations),
+        thermal_dir=Path(cfg.dataset.data.train_images),
+        transform=train_transform
     )
     
     val_dataset = FLIRDataset(
-        json_file=Path(cfg.data.val).parent / "coco.json",
-        thermal_dir=Path(cfg.data.val),
-        transform=cfg.dataset.transform
+        json_file=Path(cfg.dataset.data.val_annotations),
+        thermal_dir=Path(cfg.dataset.data.val_images),
+        transform=val_transform
     )
     
     # Create dataloaders

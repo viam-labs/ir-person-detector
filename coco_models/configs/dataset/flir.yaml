@@ -12,7 +12,7 @@ data:
 
 # Image configuration
 image:
-  size: [640, 640]  # resized images are all of equal size
+  size: [640, 640]  # images are already this size
   channels: 1  # greyscale 
   normalize: true
   mean: [0.485]  # mean (from single channel images)
@@ -22,14 +22,25 @@ image:
 classes:
   - person
 
-# Data augmentation
-augmentation:
-  enabled: true
-  horizontal_flip: true
-  vertical_flip: false
-  rotation: 15
-  brightness: 0.2
-  contrast: 0.2
+# Transform configuration
+transform:
+  train:
+    - name: Normalize
+      params:
+        mean: ${image.mean}
+        std: ${image.std}
+    - name: RandomHorizontalFlip
+      params:
+        p: 0.5
+    - name: ColorJitter
+      params:
+        brightness: 0.2
+        contrast: 0.2
+  val:
+    - name: Normalize
+      params:
+        mean: ${image.mean}
+        std: ${image.std}
 
 # COCO specific settings
 coco:
