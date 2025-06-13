@@ -154,6 +154,7 @@ def main(cfg: DictConfig):
     else:
         raise ValueError(f"Unknown model type: {cfg.model.name}")
     
+    log.info(f"model device: {model.device}")
     device = next(model.parameters()).device
     
     # Create transforms
