@@ -60,7 +60,7 @@ class DetectionTransform:
                 # Transform boxes 
                 if target is not None and 'boxes' in target:
                     boxes = target['boxes']
-                    boxes = self.transform_boxes(
+                    boxes = transform_boxes(
                         boxes,
                         resize_info['scale'],
                         resize_info['pad_left'],
