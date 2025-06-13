@@ -137,6 +137,7 @@ def train_model(model, train_loader, val_loader, optimizer, device, cfg: DictCon
 def main(cfg: DictConfig):
     # Setup logging
     setup_logging(cfg.logging)
+    log.info(f"check device: {torch.cuda.is_available()}")
     log.info(f"Configuration: \n{OmegaConf.to_yaml(cfg)}")
     
     torch.manual_seed(cfg.experiment.seed)
