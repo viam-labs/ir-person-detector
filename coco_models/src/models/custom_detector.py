@@ -12,9 +12,10 @@ import logging
 
 log = logging.getLogger(__name__)
 
-
+#@hydra.main(config_path="../../configs", config_name="model/custom_detector", version_base=None)
 class ThermalDetector(nn.Module):
     def __init__(self, cfg: DictConfig):
+        device = torch.device("cuda")
         super(ThermalDetector, self).__init__()
         
         # config vals
@@ -58,6 +59,7 @@ class ThermalDetector(nn.Module):
         self.bbox_criterion = nn.MSELoss()
         self.cls_criterion = nn.BCEWithLogitsLoss()
         
+    
     def forward(self, x):
         # Verify input size
         _, _, h, w = x.shape
@@ -117,24 +119,3 @@ class ThermalDetector(nn.Module):
         total_loss = bbox_loss + cls_loss
         
         return total_loss
-
-@hydra.main(config_path="../../configs", config_name="model/custom_detector", version_base=None)
-def main(cfg: DictConfig):
-    device = torch.device(cfg.model.device if torch.cuda.is_available() else 'cpu')
-    log.info(f"check device: {torch.cuda.is_available()}")
-    log.info(f"device is: {device}")
-    #print(f"using: {device}")
-
-    model = ThermalDetector(cfg).to(device)
-    print("custom detector model created and moved to device")
-    
-    criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(
-        model.parameters(), 
-        lr=cfg.training.learning_rate,
-        weight_decay=cfg.training.weight_decay
-    )
-    print("loss func and optimizer initialized for custom detector")
-
-if __name__ == "__main__":
-    main() 

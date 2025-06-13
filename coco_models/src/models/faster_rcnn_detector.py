@@ -34,7 +34,7 @@ class FasterRCNNDetector(nn.Module):
 
 @hydra.main(config_path="../../configs", config_name="model/faster_rcnn", version_base=None)
 def main(cfg: DictConfig):
-    device = torch.device(cfg.model.device if torch.cuda.is_available() else 'cpu')
+    device = cfg.model.device
     
     model = FasterRCNNDetector(cfg).to(device)
     print("fasterrcnn model created and moved to device")

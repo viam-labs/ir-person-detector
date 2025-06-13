@@ -107,7 +107,7 @@ class DetectionLoss(nn.Module):
 
 @hydra.main(config_path="../../configs", config_name="model/effnet", version_base=None)
 def main(cfg: DictConfig):
-    device = torch.device(cfg.model.device if torch.cuda.is_available() else 'cpu')
+    device = cfg.model.device
     print(f"Using device: {device}")
 
     model = EfficientNetDetector(cfg).to(device)

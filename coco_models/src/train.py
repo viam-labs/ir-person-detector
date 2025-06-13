@@ -37,24 +37,29 @@ def train_model(model, train_loader, val_loader, optimizer, device, cfg: DictCon
         # Training phase
         model.train()
         train_loss = 0.0
+        model = model.detector
         
         train_pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{cfg.training.num_epochs} [Train]')
         for batch_idx, (data, targets) in enumerate(train_pbar):
             # Move data to device
             data = data.to(device)
-            
+            log.info("data moved to device")
+            log.info(f"device is: {device}")
             # Move target tensors to device
             targets_on_device = {
                 'boxes': [boxes.to(device) for boxes in targets['boxes']],
                 'image_id': [img_id.to(device) for img_id in targets['image_id']]
             }
+            log.info("target tensors moved to device")
             
             optimizer.zero_grad()
             output = model(data)
             loss = model.compute_loss(output, targets_on_device)
             
+            log.info("loss computed")
             loss.backward()
             optimizer.step()
+            log.info("optimizer step completed")
             
             train_loss += loss.item()
             
@@ -141,22 +146,22 @@ def main(cfg: DictConfig):
     log.info(f"Configuration: \n{OmegaConf.to_yaml(cfg)}")
     
     torch.manual_seed(cfg.experiment.seed)
+    device = torch.device("cuda")
     
     # model created based on config
     if cfg.model.name == "custom_detector":
-        model = ThermalDetector(cfg)
+        model = ThermalDetector(cfg).to(device)
     elif cfg.model.name == "faster_rcnn":
-        model = FasterRCNNDetector(cfg)
+        model = FasterRCNNDetector(cfg).to(device)
     elif cfg.model.name == "effnet":
-        model = EfficientNetDetector(cfg)
+        model = EfficientNetDetector(cfg).to(device)
     elif cfg.model.name == "ssdlite":
-        model = SSDLiteDetector(cfg)
+        model = SSDLiteDetector(cfg).to(device)
     else:
         raise ValueError(f"Unknown model type: {cfg.model.name}")
     
     log.info(f"model device: {next(model.parameters()).is_cuda}")
-    device = next(model.parameters()).device
-    
+    device = cfg.model.device
     # Create transforms
     train_transform = build_transforms(cfg, is_train=True)
     val_transform = build_transforms(cfg, is_train=False)

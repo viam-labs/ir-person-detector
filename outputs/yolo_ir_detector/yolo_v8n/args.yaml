@@ -1,7 +1,7 @@
 task: detect
 mode: train
 model: yolov8n.pt
-data: yolo_models/data/thermal/images/train_flir_images
+data: data/thermal/dataset.yaml
 epochs: 50
 time: null
 patience: 100
