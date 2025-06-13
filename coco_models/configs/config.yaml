@@ -1,11 +1,17 @@
 # Sweep configuration for parallel runs
 hydra:
   run:
-    dir: outputs
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
   sweeper:
     params:
       model: choice(custom_detector,effnet,faster_rcnn,ssdlite)
-    max_batch_size: 4  # Number of parallel runs
+  job:
+    chdir: True
+  launcher:
+    _target_: hydra_joblib_launcher.joblib_launcher.JoblibLauncher
+    n_jobs: 4
+    backend: loky
+    prefer: processes
 
 
 defaults:
