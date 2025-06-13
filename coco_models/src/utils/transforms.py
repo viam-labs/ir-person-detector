@@ -2,6 +2,7 @@ import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
 from typing import Dict, List, Union, Tuple
+import torch.nn.functional as F_nn
 
 def custom_collate_fn(batch): #called in train.py
 
@@ -89,7 +90,7 @@ def build_transforms(cfg: Dict, is_train: bool = True) -> DetectionTransform:
         transforms = cfg.dataset.transform.val
     return DetectionTransform(transforms) 
 
-def resize_with_padding(self, image: torch.Tensor, target_size: Tuple[int, int]) -> Tuple[torch.Tensor, Dict[str, float]]:
+def resize_with_padding(image: torch.Tensor, target_size: Tuple[int, int]) -> Tuple[torch.Tensor, Dict[str, float]]:
    #maintain aspect ratio and add padding
     c, h, w = image.shape
     target_h, target_w = target_size
@@ -104,7 +105,7 @@ def resize_with_padding(self, image: torch.Tensor, target_size: Tuple[int, int])
     new_w = int(w * scale)
     
     # Resize image
-    resized_image = F.resize(image, [new_h, new_w])
+    resized_image = F_nn.interpolate(image.unsqueeze(0), size=(new_h, new_w), mode='bilinear', align_corners=False).squeeze(0) #using interpolate since they are already tensors (not PIL)
     
     # padding
     pad_h = target_h - new_h
@@ -116,6 +117,8 @@ def resize_with_padding(self, image: torch.Tensor, target_size: Tuple[int, int])
     
     # Add padding
     padded_image = F.pad(resized_image, [pad_left, pad_top, pad_right, pad_bottom], value=0)
+
+    assert padded_image.shape[-2:] == (640, 640), f"Got {padded_image.shape[-2:]}" #check if resized image is 640x640
     
     return padded_image, {
         'scale': scale,
@@ -123,15 +126,11 @@ def resize_with_padding(self, image: torch.Tensor, target_size: Tuple[int, int])
         'pad_top': pad_top #resize info
     }
 
-def transform_boxes(self, boxes: torch.Tensor, scale: float, pad_left: int, pad_top: int) -> torch.Tensor:
+def transform_boxes(boxes: torch.Tensor, scale: float, pad_left: int, pad_top: int) -> torch.Tensor:
     #bounding boxes tranformed in line wiht image tranforms 
-    # boxes are [x1, y1, w, h]
+    # boxes are [x1, y1, x2, y2]
     transformed_boxes = boxes.clone()
-    
-    # Scale coordinates
-    transformed_boxes[:, 0] = boxes[:, 0] * scale + pad_left  # x1
-    transformed_boxes[:, 1] = boxes[:, 1] * scale + pad_top   # y1
-    transformed_boxes[:, 2] = boxes[:, 2] * scale             # w
-    transformed_boxes[:, 3] = boxes[:, 3] * scale             # h
-    
+    # [x1, y1, x2, y2]
+    transformed_boxes[:, [0, 2]] = transformed_boxes[:, [0, 2]] * scale + pad_left  # x1 and x2 (since already converted in flir_dataset.py)
+    transformed_boxes[:, [1, 3]] = transformed_boxes[:, [1, 3]] * scale + pad_top   # y1 and y2
     return transformed_boxes
