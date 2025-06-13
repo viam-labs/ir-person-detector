@@ -40,7 +40,14 @@ def train_model(model, train_loader, val_loader, optimizer, device, cfg: DictCon
         
         train_pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{cfg.training.num_epochs} [Train]')
         for batch_idx, (data, target) in enumerate(train_pbar):
-            data, target = data.to(device), target.to(device)
+            # Move data to device
+            data = data.to(device)
+            
+            # Move each tensor in target to device to avoid moving entire dictionary to device (error)
+            target = {
+                'boxes': target['boxes'].to(device),
+                'image_id': target['image_id'].to(device)
+            }
             
             optimizer.zero_grad()
             output = model(data)
@@ -70,7 +77,15 @@ def train_model(model, train_loader, val_loader, optimizer, device, cfg: DictCon
         with torch.no_grad():
             val_pbar = tqdm(val_loader, desc=f'Epoch {epoch+1}/{cfg.training.num_epochs} [Val]')
             for data, target in val_pbar:
-                data, target = data.to(device), target.to(device)
+                # Move data to device
+                data = data.to(device)
+                
+                # Move each tensor in target to device
+                target = {
+                    'boxes': target['boxes'].to(device),
+                    'image_id': target['image_id'].to(device)
+                }
+                
                 output = model(data)
                 loss = model.compute_loss(output, target)
                 val_loss += loss.item()
@@ -164,7 +179,7 @@ def main(cfg: DictConfig):
         shuffle=True,
         num_workers=cfg.training.num_workers,
         pin_memory=cfg.training.pin_memory,
-        collate_fn=custom_collate_fn
+        collate_fn=custom_collate_fn  #handling batches with different number of bounding boxes 
     )
     
     val_loader = DataLoader(
