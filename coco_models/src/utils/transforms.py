@@ -116,7 +116,7 @@ def resize_with_padding(image: torch.Tensor, target_size: Tuple[int, int]) -> Tu
     pad_right = pad_w - pad_left
     
     # Add padding
-    padded_image = F.pad(resized_image, [pad_left, pad_top, pad_right, pad_bottom], value=0)
+    padded_image = F_nn.pad(resized_image, (pad_left, pad_right, pad_top, pad_bottom), mode='constant', value=0)
 
     assert padded_image.shape[-2:] == (640, 640), f"Got {padded_image.shape[-2:]}" #check if resized image is 640x640
     
