@@ -20,6 +20,9 @@ class EfficientNetDetector(nn.Module):
         # Get the number of features from the backbone
         self.num_features = 1280  # EfficientNet-B0 features
         
+        # Store expected input size
+        self.expected_size = cfg.dataset.image.size
+        
         # Detection heads
         self.bbox_head = nn.Sequential(
             nn.Linear(self.num_features, 256),
@@ -32,15 +35,21 @@ class EfficientNetDetector(nn.Module):
             nn.Linear(self.num_features, 256),
             nn.ReLU(),
             nn.Dropout(0.3),
-            nn.Linear(256, cfg.model.num_classes)
+            nn.Linear(256, cfg.model.num_classes)  # Number of classes
         )
         
         # Loss function
         self.criterion = DetectionLoss(cfg)
     
     def forward(self, x):
+        # Verify input size
+        _, _, h, w = x.shape
+        exp_h, exp_w = self.expected_size
+        if h != exp_h or w != exp_w:
+            raise ValueError(f"Expected input size {self.expected_size}, got {(h, w)}")
+            
         # Extract features from backbone
-        features = self.backbone(x)
+        features = self.backbone(x)  # Shape: [batch_size, 1280]
         
         # Get bounding box predictions
         bbox_pred = self.bbox_head(features)
