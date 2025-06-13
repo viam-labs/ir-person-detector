@@ -1,18 +1,10 @@
 # Sweep configuration for parallel runs
 hydra:
   run:
-    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S} #timestamping the runs to identify them
   sweeper:
     params:
       model: choice(custom_detector,effnet,faster_rcnn,ssdlite)
-  job:
-    chdir: True
-  launcher:
-    _target_: hydra_joblib_launcher.joblib_launcher.JoblibLauncher
-    n_jobs: 4
-    backend: loky
-    prefer: processes
-
 
 defaults:
   - model: custom_detector  
