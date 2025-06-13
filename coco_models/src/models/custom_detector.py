@@ -8,6 +8,10 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import hydra
 from omegaconf import DictConfig
+import logging
+
+log = logging.getLogger(__name__)
+
 
 class ThermalDetector(nn.Module):
     def __init__(self, cfg: DictConfig):
@@ -61,7 +65,6 @@ class ThermalDetector(nn.Module):
         if h != exp_h or w != exp_w:
             raise ValueError(f"Expected input size {self.expected_size}, got {(h, w)}")
             
-        # Extract features
         features = self.features(x)
         
         # Flatten
@@ -83,7 +86,7 @@ class ThermalDetector(nn.Module):
         all_boxes = []
         all_classes = []
         
-        # Process each image's targets
+        # getting each image's targets
         for i in range(batch_size):
             boxes = targets['boxes'][i] 
             # binary classification, one hot encoding
@@ -96,7 +99,7 @@ class ThermalDetector(nn.Module):
         bbox_target = torch.cat(all_boxes, dim=0)
         cls_target = torch.cat(all_classes, dim=0)
         
-        # Repeat predictions for each target box
+        # find predictions for each target box
         bbox_pred_repeated = []
         cls_pred_repeated = []
         for i in range(batch_size):
@@ -107,7 +110,6 @@ class ThermalDetector(nn.Module):
         bbox_pred = torch.cat(bbox_pred_repeated, dim=0)
         cls_pred = torch.cat(cls_pred_repeated, dim=0)
         
-
         bbox_loss = self.bbox_criterion(bbox_pred, bbox_target)
         cls_loss = self.cls_criterion(cls_pred, cls_target)
         
@@ -119,7 +121,9 @@ class ThermalDetector(nn.Module):
 @hydra.main(config_path="../../configs", config_name="model/custom_detector", version_base=None)
 def main(cfg: DictConfig):
     device = torch.device(cfg.model.device if torch.cuda.is_available() else 'cpu')
-    print(f"using: {device}")
+    log.info(f"check device: {torch.cuda.is_available()}")
+    log.info(f"device is: {device}")
+    #print(f"using: {device}")
 
     model = ThermalDetector(cfg).to(device)
     print("custom detector model created and moved to device")
