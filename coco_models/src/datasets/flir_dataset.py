@@ -46,8 +46,14 @@ class FLIRDataset(Dataset):
         # Convert to tensor
         boxes = torch.tensor(boxes, dtype=torch.float32)
         
+        # Create target dictionary
+        target = {
+            'boxes': boxes,
+            'image_id': torch.tensor([img_info['id']])
+        }
+        
         # Apply transforms if any
         if self.transform:
-            image = self.transform(image)
+            image, target = self.transform(image, target)
         
-        return image, {'boxes': boxes, 'image_id': torch.tensor([img_info['id']])} 
+        return image, target 
