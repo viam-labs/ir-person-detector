@@ -22,13 +22,13 @@ image:
 classes:
   - person
 
-# Transform configuration
+# Transform configuration to preprocess images to prevent overfitting
 transform:
   train:
     - name: Normalize
       params:
-        mean: ${image.mean}
-        std: ${image.std}
+        mean: [0.485]
+        std: [0.229]   
     - name: RandomHorizontalFlip
       params:
         p: 0.5
@@ -39,8 +39,8 @@ transform:
   val:
     - name: Normalize
       params:
-        mean: ${image.mean}
-        std: ${image.std}
+        mean: [0.485]
+        std: [0.229]   
 
 # COCO specific settings
 coco:
@@ -49,3 +49,5 @@ coco:
   max_bbox_size: 640
   min_bbox_area: 64
   max_bbox_area: 409600  
+
+  

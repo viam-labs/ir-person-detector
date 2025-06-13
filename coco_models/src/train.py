@@ -138,7 +138,6 @@ def main(cfg: DictConfig):
     else:
         raise ValueError(f"Unknown model type: {cfg.model.name}")
     
-    # Get device from model (already added model to device in model's main)
     device = next(model.parameters()).device
     
     # Create transforms
