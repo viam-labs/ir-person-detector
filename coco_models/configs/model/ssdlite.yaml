@@ -8,7 +8,7 @@ model:
   pretrained: true
   image_size: [640, 640]  
   backbone: mobilenet_v3_large
-  strides: [[16, 32, 64, 128, 256, 512]]
+  strides: [16, 32, 64, 128, 256, 512]  # Flattened list
 
 training:
   batch_size: 32

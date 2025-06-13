@@ -58,7 +58,7 @@ logging:
     - learning_rate
   tensorboard: true
   wandb:
-    enabled: true
+    enabled: false  # Disabled temporarily as it is causing errors
     project: ir-person-detection
     tags: ${hydra:runtime.choices.model}
   checkpoint:
