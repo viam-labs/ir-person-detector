@@ -1,7 +1,7 @@
 import torch
 import torchvision.transforms as T
+import torchvision.transforms.functional as F
 from typing import Dict, List, Union, Tuple
-import torch.nn.functional as F
 
 def custom_collate_fn(batch):
     """Custom collate function to handle batches with different numbers of bounding boxes.
@@ -31,49 +31,42 @@ class DetectionTransform:
         self.transforms = []
         for t in transforms:
             if t['name'] == 'Normalize':
-                self.transforms.append(('normalize', T.Normalize(
-                    mean=t['params']['mean'],
-                    std=t['params']['std']
-                )))
+                self.transforms.append(('normalize', t['params']['mean'], t['params']['std']))
             elif t['name'] == 'RandomHorizontalFlip':
-                self.transforms.append(('flip', T.RandomHorizontalFlip(t['params']['p'])))
+                self.transforms.append(('flip', t['params']['p']))
             elif t['name'] == 'ColorJitter':
-                self.transforms.append(('color', T.ColorJitter(
-                    brightness=t['params'].get('brightness', 0),
-                    contrast=t['params'].get('contrast', 0)
-                )))
+                self.transforms.append(('color', t['params']))
     
-    def __call__(self, image: torch.Tensor, target: Dict) -> Tuple[torch.Tensor, Dict]:
-        """
-        Apply transforms to both image and target
-        Args:
-            image: Tensor of shape [C, H, W]
-            target: Dict containing 'boxes' and 'labels'
-        Returns:
-            Transformed image and target
-        """
-        boxes = target['boxes']  # shape: [N, 4] where N is number of boxes
+    def __call__(self, image, target):
+        """Apply transforms to both image and bounding boxes."""
+        # Convert PIL Image to tensor
+        image = F.to_tensor(image)
         
-        for transform_type, t in self.transforms:
-            if transform_type == 'flip' and isinstance(t, T.RandomHorizontalFlip):
-                if torch.rand(1) < t.p:  # flip with probability p to maintain randomization
-                    image = torch.flip(image, dims=[-1])
-                    
-                    # new_x = W - old_x - width
-                    if len(boxes) > 0:  # Only process if there are boxes
-                        boxes_x1 = boxes[:, 0].clone()
-                        boxes_x2 = boxes[:, 2].clone()
-                        boxes[:, 0] = image.shape[-1] - boxes_x2
-                        boxes[:, 2] = image.shape[-1] - boxes_x1
+        for t_name, *params in self.transforms:
+            if t_name == 'normalize':
+                mean, std = params
+                image = F.normalize(image, mean=mean, std=std)
             
-            elif transform_type in ['color', 'normalize']:
-                # transforms only affect the image
-                image = t(image)
+            elif t_name == 'flip':
+                p = params[0]
+                if torch.rand(1) < p:
+                    image = F.hflip(image)
+                    if target is not None and 'boxes' in target:
+                        boxes = target['boxes']
+                        # Flip boxes: new_x = width - old_x
+                        boxes[:, [0, 2]] = image.shape[-1] - boxes[:, [2, 0]]
+                        target['boxes'] = boxes
+            
+            elif t_name == 'color':
+                params = params[0]
+                image = T.ColorJitter(**params)(image)
         
-        target['boxes'] = boxes
         return image, target
 
 def build_transforms(cfg: Dict, is_train: bool = True) -> DetectionTransform:
-    # accessing transforms from config  
-    transforms = cfg.dataset.transform.train if is_train else cfg.dataset.transform.val
+    """Build transforms from config."""
+    if is_train:
+        transforms = cfg.dataset.transform.train
+    else:
+        transforms = cfg.dataset.transform.val
     return DetectionTransform(transforms) 
