@@ -23,6 +23,9 @@ class ThermalDetector(nn.Module):
         input_channels = cfg.model.input_channels
         output_size = cfg.model.output_size
         
+        # Expected input size from config
+        self.expected_size = cfg.dataset.image.size
+        
         # CNN backbone
         layers = []
         for out_channels in backbone_channels:
@@ -36,12 +39,16 @@ class ThermalDetector(nn.Module):
         
         self.features = nn.Sequential(*layers)
         
-        # Input size of 640x640, after 3 maxpool layers (80x80)
-        flattened_size = backbone_channels[-1] * 80 * 80
+        # Calculate the size of flattened features
+        # Input size from config (e.g., 640x640)
+        # After 3 MaxPool2d layers (2x2), size is reduced by factor of 8
+        h, w = self.expected_size
+        feature_h, feature_w = h // 8, w // 8
+        feature_size = feature_h * feature_w * backbone_channels[-1]
         
         # Detection head
         self.detector = nn.Sequential(
-            nn.Linear(flattened_size, hidden_size),
+            nn.Linear(feature_size, hidden_size),
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(hidden_size, output_size)  # 4 for bbox + 1 for class
@@ -52,6 +59,12 @@ class ThermalDetector(nn.Module):
         self.cls_criterion = nn.BCEWithLogitsLoss()
         
     def forward(self, x):
+        # Verify input size
+        _, _, h, w = x.shape
+        exp_h, exp_w = self.expected_size
+        if h != exp_h or w != exp_w:
+            raise ValueError(f"Expected input size {self.expected_size}, got {(h, w)}")
+            
         # Extract features
         features = self.features(x)
         

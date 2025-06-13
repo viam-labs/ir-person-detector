@@ -47,8 +47,12 @@ class DetectionTransform:
     
     def __call__(self, image, target):
         """Apply transforms to both image and bounding boxes."""
-        # Convert PIL Image to tensor
-        image = F.to_tensor(image)
+        # Convert PIL Image to tensor and verify size
+        image = F.to_tensor(image)  # Shape: [C, H, W]
+        
+        # Verify image has 1 channel (thermal)
+        if image.shape[0] != 1:
+            raise ValueError(f"Expected 1 channel (thermal), got {image.shape[0]} channels")
         
         for t_name, *params in self.transforms:
             if t_name == 'normalize':
