@@ -39,19 +39,19 @@ def train_model(model, train_loader, val_loader, optimizer, device, cfg: DictCon
         train_loss = 0.0
         
         train_pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{cfg.training.num_epochs} [Train]')
-        for batch_idx, (data, target) in enumerate(train_pbar):
+        for batch_idx, (data, targets) in enumerate(train_pbar):
             # Move data to device
             data = data.to(device)
             
-            # Move each tensor in target to device to avoid moving entire dictionary to device (error)
-            target = {
-                'boxes': target['boxes'].to(device),
-                'image_id': target['image_id'].to(device)
+            # Move target tensors to device
+            targets_on_device = {
+                'boxes': [boxes.to(device) for boxes in targets['boxes']],
+                'image_id': [img_id.to(device) for img_id in targets['image_id']]
             }
             
             optimizer.zero_grad()
             output = model(data)
-            loss = model.compute_loss(output, target)
+            loss = model.compute_loss(output, targets_on_device)
             
             loss.backward()
             optimizer.step()
@@ -76,18 +76,18 @@ def train_model(model, train_loader, val_loader, optimizer, device, cfg: DictCon
         
         with torch.no_grad():
             val_pbar = tqdm(val_loader, desc=f'Epoch {epoch+1}/{cfg.training.num_epochs} [Val]')
-            for data, target in val_pbar:
+            for data, targets in val_pbar:
                 # Move data to device
                 data = data.to(device)
                 
-                # Move each tensor in target to device
-                target = {
-                    'boxes': target['boxes'].to(device),
-                    'image_id': target['image_id'].to(device)
+                # Move target tensors to device
+                targets_on_device = {
+                    'boxes': [boxes.to(device) for boxes in targets['boxes']],
+                    'image_id': [img_id.to(device) for img_id in targets['image_id']]
                 }
                 
                 output = model(data)
-                loss = model.compute_loss(output, target)
+                loss = model.compute_loss(output, targets_on_device)
                 val_loss += loss.item()
                 
                 # Update progress bar

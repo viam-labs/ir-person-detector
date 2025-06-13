@@ -34,6 +34,9 @@ class EfficientNetDetector(nn.Module):
             nn.Dropout(0.3),
             nn.Linear(256, cfg.model.num_classes)
         )
+        
+        # Loss function
+        self.criterion = DetectionLoss(cfg)
     
     def forward(self, x):
         # Extract features from backbone
@@ -46,6 +49,42 @@ class EfficientNetDetector(nn.Module):
         cls_pred = self.cls_head(features)
         
         return bbox_pred, cls_pred
+    
+    def compute_loss(self, output, targets):
+        bbox_pred, cls_pred = output
+        batch_size = bbox_pred.shape[0]
+        device = bbox_pred.device
+        
+        # Initialize tensors to store all boxes and classes
+        all_boxes = []
+        all_classes = []
+        
+        # Process each image's targets
+        for i in range(batch_size):
+            boxes = targets['boxes'][i]  # This is already a tensor
+            # Create one-hot encoded class labels (assuming binary classification)
+            classes = torch.ones(boxes.shape[0], 1, device=device)
+            
+            all_boxes.append(boxes)
+            all_classes.append(classes)
+        
+        # Concatenate all boxes and classes
+        bbox_target = torch.cat(all_boxes, dim=0)
+        cls_target = torch.cat(all_classes, dim=0)
+        
+        # Repeat predictions for each target box
+        bbox_pred_repeated = []
+        cls_pred_repeated = []
+        for i in range(batch_size):
+            num_boxes = targets['boxes'][i].shape[0]
+            bbox_pred_repeated.append(bbox_pred[i:i+1].repeat(num_boxes, 1))
+            cls_pred_repeated.append(cls_pred[i:i+1].repeat(num_boxes, 1))
+        
+        bbox_pred = torch.cat(bbox_pred_repeated, dim=0)
+        cls_pred = torch.cat(cls_pred_repeated, dim=0)
+        
+        # Compute loss
+        return self.criterion(bbox_pred, cls_pred, bbox_target, cls_target)
 
 class DetectionLoss(nn.Module):
     def __init__(self, cfg: DictConfig):
