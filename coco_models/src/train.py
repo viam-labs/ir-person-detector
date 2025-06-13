@@ -15,7 +15,7 @@ from models.effnet_detector import EfficientNetDetector
 from models.ssdlite_detector import SSDLiteDetector
 from datasets.flir_dataset import FLIRDataset
 from utils.logging import setup_logging
-from utils.transforms import build_transforms
+from utils.transforms import build_transforms, custom_collate_fn
 
 log = logging.getLogger(__name__)
 
@@ -163,7 +163,8 @@ def main(cfg: DictConfig):
         batch_size=cfg.training.batch_size,
         shuffle=True,
         num_workers=cfg.training.num_workers,
-        pin_memory=cfg.training.pin_memory
+        pin_memory=cfg.training.pin_memory,
+        collate_fn=custom_collate_fn
     )
     
     val_loader = DataLoader(
@@ -171,7 +172,8 @@ def main(cfg: DictConfig):
         batch_size=cfg.training.batch_size,
         shuffle=False,
         num_workers=cfg.training.num_workers,
-        pin_memory=cfg.training.pin_memory
+        pin_memory=cfg.training.pin_memory,
+        collate_fn=custom_collate_fn
     )
     
     # Create optimizer
