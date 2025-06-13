@@ -10,25 +10,20 @@ class EfficientNetDetector(nn.Module):
     def __init__(self, cfg: DictConfig):
         super(EfficientNetDetector, self).__init__()
         
-        # default weights loaded in 
         weights = EfficientNet_B0_Weights.DEFAULT
         self.backbone = efficientnet_b0(weights=weights)
         
-        # Remove the original classifier
         self.backbone.classifier = nn.Identity()
         
-        # Get the number of features from the backbone
         self.num_features = 1280  # EfficientNet-B0 features
         
-        # Store expected input size
         self.expected_size = cfg.dataset.image.size
-        
-        # Detection heads
+    
         self.bbox_head = nn.Sequential(
             nn.Linear(self.num_features, 256),
             nn.ReLU(),
             nn.Dropout(0.3),
-            nn.Linear(256, 4)  # bounding box (x, y, w, h)
+            nn.Linear(256, 4)  # bounding box 
         )
         
         self.cls_head = nn.Sequential(
@@ -42,19 +37,15 @@ class EfficientNetDetector(nn.Module):
         self.criterion = DetectionLoss(cfg)
     
     def forward(self, x):
-        # Verify input size
         _, _, h, w = x.shape
         exp_h, exp_w = self.expected_size
         if h != exp_h or w != exp_w:
             raise ValueError(f"Expected input size {self.expected_size}, got {(h, w)}")
             
-        # Extract features from backbone
         features = self.backbone(x)  # Shape: [batch_size, 1280]
         
-        # Get bounding box predictions
         bbox_pred = self.bbox_head(features)
         
-        # Get class predictions
         cls_pred = self.cls_head(features)
         
         return bbox_pred, cls_pred
@@ -68,9 +59,8 @@ class EfficientNetDetector(nn.Module):
         all_boxes = []
         all_classes = []
         
-        # Process each image's targets
         for i in range(batch_size):
-            boxes = targets['boxes'][i]  # This is already a tensor
+            boxes = targets['boxes'][i] 
             # Create one-hot encoded class labels (assuming binary classification)
             classes = torch.ones(boxes.shape[0], 1, device=device)
             
@@ -104,13 +94,13 @@ class DetectionLoss(nn.Module):
         self.cls_loss = nn.BCEWithLogitsLoss()
     
     def forward(self, bbox_pred, cls_pred, bbox_target, cls_target):
-        # Calculate bounding box loss
+        # bounding box loss
         box_loss = self.bbox_loss(bbox_pred, bbox_target)
         
-        # Calculate classification loss
+        # classification loss
         cls_loss = self.cls_loss(cls_pred, cls_target)
         
-        # Combine losses
+        # Combine losses (currently unweighted, can be changed)
         total_loss = self.lambda_box * box_loss + self.lambda_cls * cls_loss
         
         return total_loss, box_loss, cls_loss
@@ -119,22 +109,18 @@ class DetectionLoss(nn.Module):
 def main(cfg: DictConfig):
     device = torch.device(cfg.model.device if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
-    
-    # Create model
+
     model = EfficientNetDetector(cfg).to(device)
     print("effnet model created and moved to device")
-    
-    # Create loss function
+
     criterion = DetectionLoss(cfg)
-    
-    # Create optimizer
+  
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=cfg.training.learning_rate,
         weight_decay=cfg.training.weight_decay
     )
     
-    # Create learning rate scheduler
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
         mode='min',
@@ -149,8 +135,8 @@ def main(cfg: DictConfig):
     bbox_pred, cls_pred = model(dummy_input)
     
     print(f"Input shape: {dummy_input.shape}")
-    print(f"Bounding box predictions shape: {bbox_pred.shape}")
-    print(f"Classification predictions shape: {cls_pred.shape}")
+    print(f"Bounding box shape: {bbox_pred.shape}")
+    print(f"Classification shape: {cls_pred.shape}")
     
     # Print model summary using a dummy input
     print("\nModel Summary:")
