@@ -3,6 +3,28 @@ import torchvision.transforms as T
 from typing import Dict, List, Union, Tuple
 import torch.nn.functional as F
 
+def custom_collate_fn(batch):
+    """Custom collate function to handle batches with different numbers of bounding boxes.
+    
+    Args:
+        batch: List of tuples (image, target)
+        
+    Returns:
+        images: Tensor of shape [batch_size, C, H, W]
+        targets: List of targets (each target can have different number of boxes)
+    """
+    images = []
+    targets = []
+    
+    for image, target in batch:
+        images.append(image)
+        targets.append(target)
+    
+    # Stack images (they should all be the same size)
+    images = torch.stack(images, dim=0)
+    
+    return images, targets
+
 class DetectionTransform:
     # transform that can be applied to images and bounding boxes
     def __init__(self, transforms: List[Dict]):
