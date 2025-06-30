@@ -25,7 +25,7 @@ To inspect model architectures, run <pre> python model_summary.py </pre>
 ## **File Organization:**
 
 <pre>
-## running coco models 
+## running COCO models 
 coco_models/
 ├── configs
 │   ├── config.yaml
@@ -55,7 +55,7 @@ coco_models/
     └── utils
         ├── clean_dataset.py
         └── transforms.py
-  ## running YOLO model train script
+## YOLO models
 yolo_models/
 ├── configs
 │   ├── config.yaml
@@ -87,7 +87,7 @@ Two datasets were used throughout training, to compare results and optimally tra
 
 ## **Training:**
 Experimental outputs are saved in /multirun, organized according to date and time of the experiment. Config files in configs/optimization_results are saved from using Optuna hyperparameter tuning while training, and these tuned parameters can be used to override default settings for optimized train and val losses. 
-The device is configurd to CUDA GPU in the setup config, but can be changed to CPU if GPU is not available. 
+The device is configurd to CUDA GPU in the setup configs for both COCO and YOLO, but can be changed to CPU if GPU is not available. 
 
 ### **To run the training pipeline on a COCO model:**
 
@@ -129,9 +129,12 @@ Outputs are saved in /outputs, with predictions.json and metrics.json which incl
     "AP75",
     "APs",
     "APm",
-    "APl",
+    "APl"
 }
 
 ### **For YOLO models:**
 Evaluation metrics are computed by the ultralytics package, including a results.csv file, confusion matrices, mAP, precision and recall metrics and train/val batch loss diagrams. These are all saved in yolo_models/experiments when the train script is executed.
 
+## Visualization 
+
+TODO: add to this section 
