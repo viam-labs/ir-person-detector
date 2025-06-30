@@ -1,11 +1,133 @@
 # ir-person-detector
 
 
-This repository contains code for training and evaluating a person detection model using infrared video data from multiple streams. It uses Hydra to format the configs and easily navigate between different models. It is optimized for use on the Orin GPU.
-
+This repository contains code for training and evaluating a person detection model using infrared video data from multiple streams. It uses Hydra to format the configs and easily navigate between different models. It is optimized for use on the Orin GPU. 
+  
 - Training pipeline for person detection using PyTorch and Ultralytics YOLOv8
 - Utilities for:
   - Frame extraction from video
   - Visualization of bounding boxes
   - Dataset loading and augmentation
 - Modular scripts for training, evaluation, and inference
+## Models in this repo:
+
+COCO models:
+- Custom Detector with a CNN backbone
+- Efficient Net [effnet] (https://docs.pytorch.org/vision/main/models/generated/torchvision.models.efficientnet_b0.html)
+- FasterRCNN_MobileNet_V3_Large_FPN [faster_rcnn](https://docs.pytorch.org/vision/main/models/generated/torchvision.models.detection.fasterrcnn_mobilenet_v3_large_fpn.html)
+- SSDLite320_MobileNet_V3_Large [ssd_lite](https://docs.pytorch.org/vision/main/models/generated/torchvision.models.detection.ssdlite320_mobilenet_v3_large.html)
+
+YOLO Models: 
+- YOLov8n [yolov8n] (https://docs.ultralytics.com/models/yolov8/)
+
+To inspect model architectures, run <pre> python model_summary.py </pre>
+
+## **File Organization:**
+
+<pre>
+## running coco models 
+coco_models/
+├── configs
+│   ├── config.yaml
+│   ├── dataset
+│   │   ├── flir.yaml
+│   │   └── ir_data.yaml
+│   ├── model
+│   │   ├── custom_detector.yaml
+│   │   ├── effnet.yaml
+│   │   ├── faster_rcnn.yaml
+│   │   └── ssdlite.yaml
+│   └── optimization_results
+│       ├── faster_rcnn.yaml
+│       └── ssdlite.yaml  
+└── src
+    ├── datasets
+    │   ├── flir_dataset.py
+    │   ├── ir_dataset.py
+    ├── eval.py
+    ├── models
+    │   ├── custom_detector.py
+    │   ├── effnet_detector.py
+    │   ├── faster_rcnn_detector.py
+    │   └── ssdlite_detector.py
+    ├── requirements.txt
+    ├── train.py
+    └── utils
+        ├── clean_dataset.py
+        └── transforms.py
+  ## running YOLO model train script
+yolo_models/
+├── configs
+│   ├── config.yaml
+│   ├── dataset
+│   │   └── yolo.yaml
+│   └── model
+│       └── yolo.yaml
+├── experiments
+│   └── yolo_v8n_exp1_batchsize=16_in1_out5
+└── src
+    └── train_yolo.py
+#datasets
+├── FLIR_ADAS_v2 -> ../FLIR_ADAS_v2
+├── ir_data -> ../ir_data
+#preprocessing and misc scripts
+├── filter.py
+├── model_summary.py
+├── requirements.txt
+├── test_cuda.txt 
+</pre>
+
+## **Datasets:**
+
+Two datasets were used throughout training, to compare results and optimally train. Both datasets include IR images of people, however the FLIR dataset included several other classes, which required filtering to isolate the 'person' class. The script filter_flir.py can be run to remove any other classes from the annotations files. The IR dataset included a higher number of clearer images of people, with many images of crowded scenes. 
+
+1. [FLIR_ADAS dataset] (https://adas-dataset-v2.flirconservator.com/#downloadguide)
+2. [IR_data] (https://www.kaggle.com/datasets/sikdermdsaiful/thermal-images-for-human-detection)
+
+
+## **Training:**
+Experimental outputs are saved in /multirun, organized according to date and time of the experiment. Config files in configs/optimization_results are saved from using Optuna hyperparameter tuning while training, and these tuned parameters can be used to override default settings for optimized train and val losses. 
+The device is configurd to CUDA GPU in the setup config, but can be changed to CPU if GPU is not available. 
+
+### **To run the training pipeline on a COCO model:**
+
+Run: 
+<pre> bash python src/coco_models/train.py --multirun model=<your_model> optimization_results=<your_model> </your_model>
+</pre>
+
+This will save the output results in a folder in /multirun, with a best_model.pth file and tensorboard logging to monitor train and validation loss throughout training. Hydra overrides and the experiment config will be saved in multirun/hydra/. 
+
+### **To run the training pipeline on a YOLO model:**
+
+Required installation: 
+<pre> pip install ultralytics </pre>
+
+Run: <pre> bash python src/yolo_models/train_yolo.py --multirun model=<your_model> </your_model>
+</pre>
+Experiment outputs will be saved in yolo_models/experiments/. 
+
+## **Evaluating:**
+
+### **For COCO models:**
+Load the trained model best_model.pth path into src/coco_models/eval.py as
+<pre>
+  checkpoint_path = "path/to/best_model.pth"
+</pre>
+
+Run:
+<pre> bash python src/coco_models/eval.py --multirun model=<your_model> </your_model>
+</pre>
+
+Outputs are saved in /outputs, with predictions.json and metrics.json which include the bounding boxes of predictions made by inference and the following metrics:
+{
+    "AP",
+    "AP50",
+    "AP75",
+    "APs",
+    "APm",
+    "APl",
+}
+
+### **For YOLO models:**
+Evaluation metrics are computed by the ultralytics package, including a results.csv file, confusion matrices, mAP, precision and recall metrics and train/val batch loss diagrams. These are all saved in yolo_models/experiments when the train script is executed.
+
