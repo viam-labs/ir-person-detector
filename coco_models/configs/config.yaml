@@ -21,11 +21,12 @@ hydra: #if not using optuna
   sweeper:
     params:
       model: choice(custom_detector,effnet,faster_rcnn,ssdlite)
-      optimization_results: choice(custom_detector,effnet,faster_rcnn,ssdlite)
+      optimization_results: choice(faster_rcnn,ssdlite)
+      dataset: choice(ir_data,flir)
     
 defaults:
   - model: faster_rcnn  
-  - dataset: flir
+  - dataset: ir_data
   - optimization_results: faster_rcnn
   #- override hydra/sweeper: optuna #need for optuna!
   - _self_
@@ -38,14 +39,14 @@ experiment:
 
 # Training configuration once optuna is done 
 training:
-  batch_size: 64
+  batch_size: 128
   num_epochs: 25
   learning_rate: ${optimization_results.best_params.learning_rate} #1e-3
   weight_decay: ${optimization_results.best_params.weight_decay} #1e-3
   early_stopping_patience: ${optimization_results.best_params.early_stopping_patience} #15
   checkpoint_dir: checkpoints
   num_workers: 1
-  pin_memory: true
+  pin_memory: false
   #drop_prob: 0.3  #${optimization_results.best_params.dropout}
 # Logging
 logging:

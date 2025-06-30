@@ -16,8 +16,10 @@ from models.faster_rcnn_detector import FasterRCNNDetector
 from models.effnet_detector import EfficientNetDetector
 from models.ssdlite_detector import SSDLiteDetector
 from datasets.flir_dataset import FLIRDataset
-from utils.transforms import build_transforms, custom_collate_fn
+from datasets.ir_dataset import IRDataset
+from utils.transforms import build_transforms, GPUCollate
 from torch.utils.tensorboard import SummaryWriter
+import torch.multiprocessing as mp
 import gc
 
 log = logging.getLogger(__name__)
@@ -42,17 +44,17 @@ def train_model(model, train_loader, val_loader, optimizer, scheduler, device, c
         train_pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{cfg.training.num_epochs} [Train]')
         for batch_idx, (data, targets) in enumerate(train_pbar):
             # Move data to device
-            data = data.to(device)
+            #data = data.to(device) #donein GPUcollate now
             # move target tensors to device as list of dicts 
-            targets_on_device = [{k: v.to(device) for k, v in t.items()} for t in targets] #standard format for all models
+            #targets_on_device = [{k: v.to(device) for k, v in t.items()} for t in targets] #standard format for all models
             optimizer.zero_grad()
             high_loss = []
 
             if cfg.model.name in ["faster_rcnn", "ssdlite"]: #for torchvision models: they return a Dict[Tensor] which contains classification and regression losses
-                loss_dict = model(data, targets_on_device)
+                loss_dict = model(data, targets)
                 for k, v in loss_dict.items():
                     if v.item() > 100:
-                        img_ids = [t['image_id'].item() for t in targets_on_device]
+                        img_ids = [t['image_id'].item() for t in targets]
                         high_loss.append({
                             'batch_idx': batch_idx,
                             'loss_type': k,
@@ -62,7 +64,7 @@ def train_model(model, train_loader, val_loader, optimizer, scheduler, device, c
                 loss = sum(loss_dict.values()) #sum of classification and regression losses
             else:
                 outputs = model(data) #standard format for custom pytorch models 
-                loss_dict = compute_loss(outputs, targets_on_device)
+                loss_dict = compute_loss(outputs, targets)
                 loss = loss_dict['total_loss']
 
             loss.backward()
@@ -82,7 +84,7 @@ def train_model(model, train_loader, val_loader, optimizer, scheduler, device, c
 
         avg_losses = {k: v/len(train_loader) for k, v in train_losses.items()}
         avg_train_loss = sum(avg_losses.values())
-        #avg_train_loss = train_loss / len(train_loader)
+        avg_train_loss = train_loss / len(train_loader) 
             
         #logging high loss image ids     
         log.info(f"high losses in epoch{epoch+1}")
@@ -148,12 +150,7 @@ def evaluate_validation(model, val_loader, device, epoch, cfg: DictConfig):
     val_loss = 0.0
     with torch.no_grad():
         for batch_idx, (images, targets) in enumerate(val_loader):
-            images = [img.to(device) for img in images]
-            targets = [{k: v.to(device) for k, v in t.items()} for t in targets]    
-            # Log validation batch info
-            #log.info(f"Validation batch {batch_idx}")
-            #log.info(f"Target boxes: {[t['boxes'].shape for t in targets]}")
-        
+            # Data is already on GPU from GPUCollate
             loss_dict = model(images, targets)
             
             batch_loss = sum(loss_dict.values()).item()
@@ -171,10 +168,9 @@ def evaluate_validation_custom(model, val_loader, device, epoch, cfg: DictConfig
     with torch.no_grad():
         val_pbar = tqdm(val_loader, desc=f'Epoch {epoch+1}/{cfg.training.num_epochs} [Val]')
         for i, (data, targets) in enumerate(val_pbar):
-            data = data.to(device)
-            targets_on_device = [{k: v.to(device) for k, v in t.items()} for t in targets]
+            # Data is already on GPU from GPUCollate
             outputs = model(data)
-            loss = criterion(outputs, targets_on_device)
+            loss = criterion(outputs, targets)
             val_loss += loss.item()
             val_pbar.set_postfix({'val_loss': loss.item()})
 
@@ -210,6 +206,9 @@ def compute_loss(predictions, targets): #only for custom detector since torchvis
 
 @hydra.main(config_path="../configs", config_name="config", version_base=None)
 def main(cfg: DictConfig):
+    # Set multiprocessing start method to 'spawn' for CUDA compatibility
+    mp.set_start_method('spawn', force=True)
+    
     # Log config
     log.info(f"check device: {torch.cuda.is_available()}")
     log.info(f"config: \n{OmegaConf.to_yaml(cfg)}")
@@ -239,20 +238,31 @@ def main(cfg: DictConfig):
         val_transform = model.transforms
    # else: #for custom and effnet 
     train_transform = build_transforms(cfg, is_train=True, test=False)
-    val_transform = build_transforms(cfg, is_train=False, test=False)
+    val_transform = build_transforms(cfg, is_train=False, test=False)    
+    # Create datasets (FLIR)
+    # train_dataset = FLIRDataset(
+    #     json_file=Path(cfg.dataset.data.train_annotations),
+    #     thermal_dir=Path(cfg.dataset.data.train_images),
+    #     transform=train_transform
+    #     # can add device parameter here to avoid moving to device? 
+    # )
     
-    # Create datasets
-    train_dataset = FLIRDataset(
+    # val_dataset = FLIRDataset(
+    #     json_file=Path(cfg.dataset.data.val_annotations),
+    #     thermal_dir=Path(cfg.dataset.data.val_images),
+    #     transform=val_transform
+    # )
+
+    train_dataset = IRDataset(
         json_file=Path(cfg.dataset.data.train_annotations),
         thermal_dir=Path(cfg.dataset.data.train_images),
-        transform=train_transform
-        # can add device parameter here to avoid moving to device? 
+        #transform=train_transform
     )
-    
-    val_dataset = FLIRDataset(
+
+    val_dataset = IRDataset(
         json_file=Path(cfg.dataset.data.val_annotations),
         thermal_dir=Path(cfg.dataset.data.val_images),
-        transform=val_transform
+        #transform=val_transform
     )
     
     # Create dataloaders
@@ -262,7 +272,7 @@ def main(cfg: DictConfig):
         shuffle=True,
         num_workers=cfg.training.num_workers,
         pin_memory=cfg.training.pin_memory,
-        collate_fn=custom_collate_fn 
+        collate_fn=GPUCollate(device, train_transform) 
     )
     
     val_loader = DataLoader(
@@ -271,7 +281,7 @@ def main(cfg: DictConfig):
         shuffle=False,
         num_workers=cfg.training.num_workers,
         pin_memory=cfg.training.pin_memory,
-        collate_fn=custom_collate_fn
+        collate_fn=GPUCollate(device, val_transform)
     )
     
     # Create optimizer
