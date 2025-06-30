@@ -96,9 +96,9 @@ Run:
 </pre>
 The model name options are custom_detector, effnet, ssdlite or faster_rcnn. 
 
-Any config parameters can be directly overriden from the terminal by adding <pre> ++param_name=override_value </pre> at the end of the above command. 
+Any config parameters can be directly overriden from the terminal by adding the following at the end of the above command. <pre> ++param_name=override_value </pre>
 
-This will save the output results in a folder in /multirun, with a best_model.pth file and tensorboard logging to monitor train and validation loss throughout training. Hydra overrides and the experiment config will be saved in multirun/hydra/. 
+At the end of training, output results will be saved in a folder corresponding to the date and time of the experiment in /multirun, with a best_model.pth file and tensorboard logging to monitor train and validation loss throughout training. Hydra overrides and the experiment config will be saved in multirun/hydra/. Training logs will be outputted in train.log in the same folder.
 
 ### **To run the training pipeline on a YOLO model:**
 
@@ -112,10 +112,10 @@ Experiment outputs will be saved in yolo_models/experiments/.
 ## **Evaluating:**
 
 ### **For COCO models:**
-Load the trained model best_model.pth path into src/coco_models/eval.py as 
+Load the trained model (best_model.pth) path into src/coco_models/eval.py by editing the script.
 <pre>
 checkpoint_path = "path/to/best_model.pth"
-</pre> by editing the script. 
+</pre>
 
 Run:
 <pre> bash python src/coco_models/eval.py --multirun model=model_name
