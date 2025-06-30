@@ -13,12 +13,12 @@ This repository contains code for training and evaluating a person detection mod
 
 COCO models:
 - Custom Detector with a CNN backbone
-- Efficient Net [effnet] (https://docs.pytorch.org/vision/main/models/generated/torchvision.models.efficientnet_b0.html)
-- FasterRCNN_MobileNet_V3_Large_FPN [faster_rcnn](https://docs.pytorch.org/vision/main/models/generated/torchvision.models.detection.fasterrcnn_mobilenet_v3_large_fpn.html)
-- SSDLite320_MobileNet_V3_Large [ssd_lite](https://docs.pytorch.org/vision/main/models/generated/torchvision.models.detection.ssdlite320_mobilenet_v3_large.html)
+- [Efficient Net](https://docs.pytorch.org/vision/main/models/generated/torchvision.models.efficientnet_b0.html)
+- [FasterRCNN_MobileNet_V3_Large_FPN](https://docs.pytorch.org/vision/main/models/generated/torchvision.models.detection.fasterrcnn_mobilenet_v3_large_fpn.html)
+- [SSDLite320_MobileNet_V3_Large](https://docs.pytorch.org/vision/main/models/generated/torchvision.models.detection.ssdlite320_mobilenet_v3_large.html)
 
-YOLO Models: 
-- YOLov8n [yolov8n] (https://docs.ultralytics.com/models/yolov8/)
+YOLO Model:
+- [YOLov8n](https://docs.ultralytics.com/models/yolov8/)
 
 To inspect model architectures, run <pre> python model_summary.py </pre>
 
@@ -81,8 +81,8 @@ yolo_models/
 
 Two datasets were used throughout training, to compare results and optimally train. Both datasets include IR images of people, however the FLIR dataset included several other classes, which required filtering to isolate the 'person' class. The script filter_flir.py can be run to remove any other classes from the annotations files. The IR dataset included a higher number of clearer images of people, with many images of crowded scenes. 
 
-1. [FLIR_ADAS dataset] (https://adas-dataset-v2.flirconservator.com/#downloadguide)
-2. [IR_data] (https://www.kaggle.com/datasets/sikdermdsaiful/thermal-images-for-human-detection)
+1. [FLIR_ADAS dataset](https://adas-dataset-v2.flirconservator.com/#downloadguide)
+2. [IR_data](https://www.kaggle.com/datasets/sikdermdsaiful/thermal-images-for-human-detection)
 
 
 ## **Training:**
@@ -92,8 +92,11 @@ The device is configurd to CUDA GPU in the setup config, but can be changed to C
 ### **To run the training pipeline on a COCO model:**
 
 Run: 
-<pre> bash python src/coco_models/train.py --multirun model=<your_model> optimization_results=<your_model> </your_model>
+<pre> bash python src/coco_models/train.py --multirun model=model_name optimization_results=model_name
 </pre>
+The model name options are custom_detector, effnet, ssdlite or faster_rcnn. 
+
+Any config parameters can be directly overriden from the terminal by adding <pre> ++param_name=override_value </pre> at the end of the above command. 
 
 This will save the output results in a folder in /multirun, with a best_model.pth file and tensorboard logging to monitor train and validation loss throughout training. Hydra overrides and the experiment config will be saved in multirun/hydra/. 
 
@@ -102,21 +105,22 @@ This will save the output results in a folder in /multirun, with a best_model.pt
 Required installation: 
 <pre> pip install ultralytics </pre>
 
-Run: <pre> bash python src/yolo_models/train_yolo.py --multirun model=<your_model> </your_model>
+Run: <pre> bash python src/yolo_models/train_yolo.py --multirun model=model_name
 </pre>
 Experiment outputs will be saved in yolo_models/experiments/. 
 
 ## **Evaluating:**
 
 ### **For COCO models:**
-Load the trained model best_model.pth path into src/coco_models/eval.py as
+Load the trained model best_model.pth path into src/coco_models/eval.py as 
 <pre>
-  checkpoint_path = "path/to/best_model.pth"
-</pre>
+checkpoint_path = "path/to/best_model.pth"
+</pre> by editing the script. 
 
 Run:
-<pre> bash python src/coco_models/eval.py --multirun model=<your_model> </your_model>
+<pre> bash python src/coco_models/eval.py --multirun model=model_name
 </pre>
+The model name options are custom_detector, effnet, ssdlite or faster_rcnn. There is no need to override optimization results during evaluation as the config is not referenced during training. 
 
 Outputs are saved in /outputs, with predictions.json and metrics.json which include the bounding boxes of predictions made by inference and the following metrics:
 {
