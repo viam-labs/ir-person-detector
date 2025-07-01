@@ -1,42 +1,38 @@
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 from tqdm import tqdm
-import numpy as np
 import json
-from PIL import Image
-import pickle
 import hydra
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 import logging
 from pathlib import Path
-from hydra.utils import get_original_cwd, to_absolute_path
+from hydra.utils import get_original_cwd
 import torch
-from torchvision.models.detection import fasterrcnn_mobilenet_v3_large_fpn, FasterRCNN_MobileNet_V3_Large_FPN_Weights
-# Import model implementations and dataset
 from models.custom_detector import ThermalDetector
 from models.faster_rcnn_detector import FasterRCNNDetector
 from models.effnet_detector import EfficientNetDetector
 from models.ssdlite_detector import SSDLiteDetector
-from datasets.flir_dataset import FLIRDataset
-from utils.transforms import build_transforms, custom_collate_fn
+from datasets.ir_dataset import IRDataset
+from utils.transforms import build_transforms, GPUCollate
+import multiprocessing as mp
 
 log = logging.getLogger(__name__)
 
-def evaluate_model(model, data_loader, device, cfg: DictConfig):
+def evaluate_model(model, data_loader, cfg: DictConfig):
     """
     Evaluate model on test set and compute COCO metrics
     """
+    model.eval()
     results = []
     total_predictions = 0
     total_boxes = 0
     
     with torch.no_grad():
         for batch_idx, (data, targets) in enumerate(tqdm(data_loader)):
-            data = data.to(device)
             predictions = model(data)
-            #log.info(f"Scores before filtering: {predictions[0]['scores']}")
-            #log.info(f"Boxes before filtering: {predictions[0]['boxes'].shape}")
+            log.info(f"pred scores: {predictions[0]['scores']}")
+            log.info(f"pred boxes: {predictions[0]['boxes'].shape}")
                         
             for pred, target in zip(predictions, targets):
                 image_id = target['image_id'].item()
@@ -64,18 +60,18 @@ def evaluate_model(model, data_loader, device, cfg: DictConfig):
                         for box, score in zip(boxes_coco, scores)
                     ])
                     
-           # if batch_idx == 0:  # Log detailed info for first batch
-                    #log.info(f"First batch complete. Total boxes found: {total_boxes}")
-                    #log.info(f"Results so far: {results}")
+            if batch_idx == 0:  # Log detailed info for first batch
+                    log.info(f"First batch complete. Total boxes found: {total_boxes}")
+                    log.info(f"Results so far: {results}")
    
-    #log.info(f"Evaluation complete. Total predictions: {total_predictions}")
-   # log.info(f"Total boxes detected: {total_boxes}")
+    log.info(f"Evaluation complete. Total predictions: {total_predictions}")
+    log.info(f"Total boxes detected: {total_boxes}")
     return results
 
 @hydra.main(config_path="../configs", config_name="config", version_base=None)
 def main(cfg: DictConfig):
     base_dir = Path(get_original_cwd())
-    
+    mp.set_start_method('spawn', force=True)
     device = cfg.model.device
     
     #Create model
@@ -89,32 +85,20 @@ def main(cfg: DictConfig):
         model = SSDLiteDetector(cfg).to(device)
     else:
         raise ValueError(f"Unknown model type: {cfg.model.name}")
-
-    #load best model 
-    #checkpoint_path = Path(cfg.logging.save_dir) / 'best_model.pth'
-    checkpoint_path = "/root/ir-person-detector/multirun/2025-06-26/14-41-38/0/best_model.pth"
-    checkpoint = torch.load(checkpoint_path)
+ 
+    checkpoint_path = "/root/ir-person-detector/multirun/2025-07-01/16-04-55/0/best_model.pth"
+    checkpoint = torch.load(checkpoint_path, map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
     log.info(f"Loaded checkpoint frm experiment: {checkpoint_path}")
-
-
-    #Load pretrained model as test
-    #weights = FasterRCNN_MobileNet_V3_Large_FPN_Weights.DEFAULT
-    #model = fasterrcnn_mobilenet_v3_large_fpn(weights=weights)
-
-    #model.to(device)
-    model.eval()
-    # Add model verification
+    
     log.info(f"Model device: {next(model.parameters()).device}")
-    log.info(f"Model training mode: {model.training}")
 
     test_transform = build_transforms(cfg, is_train=False, test=True)
 
     # Create test dataset and dataloader
-    test_dataset = FLIRDataset(
-        json_file= base_dir / cfg.dataset.data.test_annotations,
-        thermal_dir= base_dir / cfg.dataset.data.test_images,
-        transform=test_transform
+    test_dataset = IRDataset(
+        json_file= Path(cfg.dataset.data.test_annotations),
+        thermal_dir= Path(cfg.dataset.data.test_images),
     )
     
     test_loader = DataLoader(
@@ -123,11 +107,10 @@ def main(cfg: DictConfig):
         shuffle=False,
         num_workers= cfg.training.num_workers,
         pin_memory=cfg.training.pin_memory,
-        collate_fn=custom_collate_fn
+        collate_fn=GPUCollate(device, test_transform)
     )
 
-    # Eval
-    results = evaluate_model(model, test_loader, device, cfg)
+    results = evaluate_model(model, test_loader, cfg)
 
     # saving predictions
     output_dir = Path(cfg.logging.save_dir)
@@ -137,7 +120,7 @@ def main(cfg: DictConfig):
         json.dump(results, f)
 
     # COCO metrics
-    gt_path = base_dir / cfg.dataset.data.test_annotations
+    gt_path = Path(cfg.dataset.data.test_annotations)
     # Load and check contents
     with open(predictions_file, 'r') as f:
         pred_data = json.load(f)
@@ -153,12 +136,13 @@ def main(cfg: DictConfig):
     gt_img_ids = set(ann['image_id'] for ann in gt_data['annotations'])
     matching_ids = pred_img_ids.intersection(gt_img_ids)
     log.info(f"matching image IDs: {len(matching_ids)}")
-    
+
     coco_gt = COCO(gt_path)
+    log.info(f"Categories in dataset: {coco_gt.loadCats(coco_gt.getCatIds())}")
     coco_dt = coco_gt.loadRes(str(predictions_file))
     
     coco_eval = COCOeval(cocoGt=coco_gt, cocoDt=coco_dt)
-    #coco_eval.params.catIds = [1]
+    coco_eval.params.catIds = [1]
     coco_eval.params.iouType = 'bbox'
 
 

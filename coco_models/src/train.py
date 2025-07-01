@@ -43,24 +43,10 @@ def train_model(model, train_loader, val_loader, optimizer, scheduler, device, c
                         
         train_pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{cfg.training.num_epochs} [Train]')
         for batch_idx, (data, targets) in enumerate(train_pbar):
-            # Move data to device
-            #data = data.to(device) #donein GPUcollate now
-            # move target tensors to device as list of dicts 
-            #targets_on_device = [{k: v.to(device) for k, v in t.items()} for t in targets] #standard format for all models
             optimizer.zero_grad()
-            high_loss = []
 
             if cfg.model.name in ["faster_rcnn", "ssdlite"]: #for torchvision models: they return a Dict[Tensor] which contains classification and regression losses
                 loss_dict = model(data, targets)
-                for k, v in loss_dict.items():
-                    if v.item() > 100:
-                        img_ids = [t['image_id'].item() for t in targets]
-                        high_loss.append({
-                            'batch_idx': batch_idx,
-                            'loss_type': k,
-                            'loss_value': v.item(),
-                            'image_ids': img_ids,
-                        })
                 loss = sum(loss_dict.values()) #sum of classification and regression losses
             else:
                 outputs = model(data) #standard format for custom pytorch models 
@@ -69,7 +55,6 @@ def train_model(model, train_loader, val_loader, optimizer, scheduler, device, c
 
             loss.backward()
             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0) # gradient clipping to avoid exploding gradients
-            writer.add_scalar('Gradient/norm', grad_norm)
             optimizer.step()
             train_loss += loss.item() #maintain running loss total 
 
@@ -85,13 +70,6 @@ def train_model(model, train_loader, val_loader, optimizer, scheduler, device, c
         avg_losses = {k: v/len(train_loader) for k, v in train_losses.items()}
         avg_train_loss = sum(avg_losses.values())
         avg_train_loss = train_loss / len(train_loader) 
-            
-        #logging high loss image ids     
-        log.info(f"high losses in epoch{epoch+1}")
-        for record in high_loss:
-            log.info(f"batch {record['batch_idx']}: {record['loss_type']} = {record['loss_value']:.4f}")
-            log.info(f"image ids: {record['image_ids']}")
-
         # Choose validation function based on model type
         if cfg.model.name in ["faster_rcnn", "ssdlite"]:
             avg_val_loss = evaluate_validation(model, val_loader, device, epoch, cfg)
@@ -111,7 +89,6 @@ def train_model(model, train_loader, val_loader, optimizer, scheduler, device, c
         log.info(f'Epoch {epoch+1}/{cfg.training.num_epochs}: '
                 f'Avg Train Loss: {avg_train_loss:.4f}, '
                 f'Avg Val Loss: {avg_val_loss:.4f}')
-
 
         # Save checkpoint
         if avg_val_loss < best_val_loss:
@@ -150,7 +127,6 @@ def evaluate_validation(model, val_loader, device, epoch, cfg: DictConfig):
     val_loss = 0.0
     with torch.no_grad():
         for batch_idx, (images, targets) in enumerate(val_loader):
-            # Data is already on GPU from GPUCollate
             loss_dict = model(images, targets)
             
             batch_loss = sum(loss_dict.values()).item()
@@ -168,7 +144,6 @@ def evaluate_validation_custom(model, val_loader, device, epoch, cfg: DictConfig
     with torch.no_grad():
         val_pbar = tqdm(val_loader, desc=f'Epoch {epoch+1}/{cfg.training.num_epochs} [Val]')
         for i, (data, targets) in enumerate(val_pbar):
-            # Data is already on GPU from GPUCollate
             outputs = model(data)
             loss = criterion(outputs, targets)
             val_loss += loss.item()
@@ -232,37 +207,18 @@ def main(cfg: DictConfig):
     else:
         raise ValueError(f"Unknown model type: {cfg.model.name}")
    
-    #transforms 
-   # if cfg.model.name in ["ssdlite", "faster_rcnn"]:
-        train_transform = model.transforms # make these specific to each model 
-        val_transform = model.transforms
-   # else: #for custom and effnet 
+
     train_transform = build_transforms(cfg, is_train=True, test=False)
     val_transform = build_transforms(cfg, is_train=False, test=False)    
-    # Create datasets (FLIR)
-    # train_dataset = FLIRDataset(
-    #     json_file=Path(cfg.dataset.data.train_annotations),
-    #     thermal_dir=Path(cfg.dataset.data.train_images),
-    #     transform=train_transform
-    #     # can add device parameter here to avoid moving to device? 
-    # )
-    
-    # val_dataset = FLIRDataset(
-    #     json_file=Path(cfg.dataset.data.val_annotations),
-    #     thermal_dir=Path(cfg.dataset.data.val_images),
-    #     transform=val_transform
-    # )
 
     train_dataset = IRDataset(
         json_file=Path(cfg.dataset.data.train_annotations),
         thermal_dir=Path(cfg.dataset.data.train_images),
-        #transform=train_transform
     )
 
     val_dataset = IRDataset(
         json_file=Path(cfg.dataset.data.val_annotations),
         thermal_dir=Path(cfg.dataset.data.val_images),
-        #transform=val_transform
     )
     
     # Create dataloaders

@@ -71,12 +71,9 @@ class DetectionTransform:
     def __call__(self, images, targets):
         #transforms to both image and bounding boxes
         #images are already tensors when using GPUCollate
-        
-        assert torch.equal(images[0,0], images[0,1]) and torch.equal(images[0,0], images[0,2]), "Channels not equal in first image"
-        #images = images[:,0:1] #reducing channel size to 1 if assert passes
+        assert images.shape[1] == 1, "Expected single channel images"
         assert len(images.shape) == 4, f"expected batched images [B,C,H,W], got shape {images.shape}"
         
-       # image = image.repeat(3, 1, 1)  # Convert 1-channel to 3-channel (trial to see if this improves overfitting!!)
         for t_name, *params in self.transforms:
 
             #images are batched tensors of [batch_size, C, H, W]
@@ -107,7 +104,6 @@ class DetectionTransform:
             
             elif t_name == 'flip_h':
                 p = params[0]
-                prob_h = torch.rand(1)
                 flip_mask = (torch.rand(images.shape[0], device=images.device) < p) #generating mask of booleans for whethr to flip or not
                 # Flip whole batch where mask is True
                 images[flip_mask] = F.hflip(images[flip_mask])
@@ -119,7 +115,6 @@ class DetectionTransform:
 
             elif t_name == 'flip_v':
                 p = params[0]
-                prob_v = torch.rand(1)
                 flip_mask = (torch.rand(images.shape[0], device=images.device) < p) 
                 images[flip_mask] = F.vflip(images[flip_mask])
                 for i, flip_true in enumerate(flip_mask):
@@ -130,9 +125,12 @@ class DetectionTransform:
                         targets[i]['boxes'] = boxes
             
             elif t_name == 'rotate':
-                degrees= params[0]
-                prob_r = torch.rand(1)
-                angles = torch.empty(images.shape[0], device=images.device).uniform_(-degrees, degrees)
+                degrees = params[0]
+                p = 0.3  # probability of applying rotation, could be made configurable
+                rotate_mask = (torch.rand(images.shape[0], device=images.device) < p)
+                # generate angles for images that will be rotated
+                angles = torch.zeros(images.shape[0], device=images.device)
+                angles[rotate_mask] = torch.empty(rotate_mask.sum(), device=images.device).uniform_(-degrees, degrees)
                 images, targets = rotate_batch(images, targets, angles)
         
         return images, targets

@@ -36,7 +36,10 @@ class IRDataset(Dataset):
         if not img_path.exists():
             raise RuntimeError(f"TRYING TO OPEN NON-EXISTENT FILE: {img_path}")
         image = Image.open(img_path)
+        # Convert to tensor and ensure single channel
         image = F.to_tensor(image)
+
+        image = image[0:1]  #filtering to one channel only
         # Get annotations for this image
         img_anns = self.annotations[img_info['id']]
         

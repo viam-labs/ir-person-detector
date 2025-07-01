@@ -107,13 +107,26 @@ def clean_dataset(json_path, img_dir, output_json_path):
     log.info(f"Remaining images: {len(cleaned_data['images'])}")
     log.info(f"Remaining annotations: {len(cleaned_data['annotations'])}")
 
+def shift_category_ids(json_path):
+    with open(json_path) as f:
+        data = json.load(f)
+    for ann in data["annotations"]:
+        ann["category_id"] += 1
+    for cat in data["categories"]:
+        cat["id"] += 1
+
+    with open(json_path, "w") as f:
+        json.dump(data, f, indent=2)
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Clean COCO dataset by removing invalid annotations')
     parser.add_argument('--json_path', type=str, required=True, help='Path to input COCO JSON file')
     parser.add_argument('--img_dir', type=str, required=True, help='Path to directory containing images')
-    parser.add_argument('--output_json', type=str, required=True, help='Path to save cleaned JSON file')
+    #parser.add_argument('--output_json', type=str, required=True, help='Path to save cleaned JSON file')
     
     args = parser.parse_args()
-    
+    shift_category_ids(args.json_path)
     clean_dataset(args.json_path, args.img_dir, args.output_json) 
+    
