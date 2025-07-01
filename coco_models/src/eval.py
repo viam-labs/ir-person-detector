@@ -32,7 +32,8 @@ def evaluate_model(model, data_loader, cfg: DictConfig):
         for batch_idx, (data, targets) in enumerate(tqdm(data_loader)):
             predictions = model(data)
             log.info(f"pred scores: {predictions[0]['scores']}")
-            log.info(f"pred boxes: {predictions[0]['boxes'].shape}")
+            log.info(f"pred boxes: {predictions[0]['boxes']}")
+            log.info(f"pred labels: {predictions[0]['labels']}")
                         
             for pred, target in zip(predictions, targets):
                 image_id = target['image_id'].item()
@@ -86,10 +87,10 @@ def main(cfg: DictConfig):
     else:
         raise ValueError(f"Unknown model type: {cfg.model.name}")
  
-    checkpoint_path = "/root/ir-person-detector/multirun/2025-07-01/16-04-55/0/best_model.pth"
+    checkpoint_path = "/root/ir-person-detector/multirun/2025-07-01/18-17-19/0/best_model.pth"
     checkpoint = torch.load(checkpoint_path, map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
-    log.info(f"Loaded checkpoint frm experiment: {checkpoint_path}")
+    log.info(f"Loaded checkpoint from experiment: {checkpoint_path}")
     
     log.info(f"Model device: {next(model.parameters()).device}")
 

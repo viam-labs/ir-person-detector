@@ -32,7 +32,7 @@ class GPUCollate:
             # Create target dict with single tensors (not lists)
             target_dict = {
                 'boxes': target['boxes'],  # already a tensor from dataset
-                'labels': torch.ones(target['boxes'].shape[0], dtype=torch.int64),  # all 1s for person class
+                'labels': target['labels'],  # preserve labels from dataset
                 'image_id': target['image_id']  # already a tensor from dataset
             }
             targets.append(target_dict)

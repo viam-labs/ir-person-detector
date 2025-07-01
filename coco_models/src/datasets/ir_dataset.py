@@ -38,9 +38,7 @@ class IRDataset(Dataset):
         image = Image.open(img_path)
         # Convert to tensor and ensure single channel
         image = F.to_tensor(image)
-
         image = image[0:1]  #filtering to one channel only
-        # Get annotations for this image
         img_anns = self.annotations[img_info['id']]
         
         # Extract bounding boxes
@@ -56,12 +54,8 @@ class IRDataset(Dataset):
         # Create target dictionary
         target = {
             'boxes': boxes,
-            'labels': torch.zeros(boxes.shape[0], dtype=torch.int64),  # all 0s for person class
+            'labels': torch.ones(boxes.shape[0], dtype=torch.int64),  # all 1s for person class
             'image_id': torch.tensor([img_info['id']])
         }
-        
-        # Apply transforms if any
-        #if self.transform:
-        #    image, target = self.transform(image, target) #not applying transforms here to instead apply them in the dataloader with GPU
-        
+        #applying transfomrs in dataloader with GPUCollate now
         return image, target

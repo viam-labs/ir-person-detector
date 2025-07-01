@@ -27,7 +27,7 @@ class FasterRCNNDetector(nn.Module):
         # Load pretrained model withOUT default weights
         self.model = FasterRCNN(
             backbone= backbone_fpn,
-            num_classes=cfg.model.num_classes +1, #automatically adds "background" class through RPN 
+            num_classes=cfg.model.num_classes +1,
             box_nms_thresh=0.5,     # NMS IoU threshold
             box_detections_per_img=10  # Max detections per image
         )
