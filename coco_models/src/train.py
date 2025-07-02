@@ -241,17 +241,22 @@ def main(cfg: DictConfig):
     )
     
     # Create optimizer
-    optimizer = torch.optim.Adam(
-        model.parameters(),  
-        lr=cfg.training.learning_rate,
-        weight_decay=cfg.training.weight_decay,
+  
+    optimizer = torch.optim.SGD(
+            model.parameters(),
+            lr=cfg.training.learning_rate,
+            momentum=0.9,
+            weight_decay=cfg.training.weight_decay
+        )
+    
+    scheduler = ReduceLROnPlateau(
+        optimizer,
+        mode='min',
+        factor=0.1,
+        patience=3, 
+        min_lr=1e-6,
+        verbose=True 
     )
-
-    scheduler = ReduceLROnPlateau(optimizer, 
-                             mode='min',           # minimize validation loss
-                             factor=0.1,           # reduce LR by factor of 10
-                             patience=5,              
-                             min_lr=1e-6)  
     
     # train model and get best validation loss
     best_val_loss = train_model(

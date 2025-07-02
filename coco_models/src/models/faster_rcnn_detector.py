@@ -29,12 +29,12 @@ class FasterRCNNDetector(nn.Module):
             backbone= backbone_fpn,
             num_classes=cfg.model.num_classes +1,
             box_nms_thresh=0.5,     # NMS IoU threshold
-            box_detections_per_img=10  # Max detections per image
+            box_detections_per_img=10,   # Lower the confidence threshold
         )
         
         input_h, input_w = cfg.model.transform.input_size
         self.model.transform = SingleChannelRCNNTransform(
-            min_size= input_h, #can adjust accordingly 
+            min_size= input_h, #can adjust 
             max_size=input_w,
             image_mean=[0.485],
             image_std=[0.229]
@@ -61,7 +61,7 @@ def replace_first_conv_to_1channel(conv3: nn.Conv2d) -> nn.Conv2d:
         bias=(conv3.bias is not None)
     )
     # Custom init
-    nn.init.kaiming_normal_(new_conv.weight, mode='fan_out', nonlinearity='relu')
+    nn.init.kaiming_normal_(new_conv.weight, mode='fan_out', nonlinearity='relu') #fan out for preserving weight variance 
     if new_conv.bias is not None:
-        nn.init.zeros_(new_conv.bias)
+        nn.init.zeros_(new_conv.bias) #initializes bias to 0 as weights will be adjusted later
     return new_conv

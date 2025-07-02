@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 from hydra.utils import get_original_cwd
 import torch
+import numpy as np
 from models.custom_detector import ThermalDetector
 from models.faster_rcnn_detector import FasterRCNNDetector
 from models.effnet_detector import EfficientNetDetector
@@ -16,8 +17,44 @@ from models.ssdlite_detector import SSDLiteDetector
 from datasets.ir_dataset import IRDataset
 from utils.transforms import build_transforms, GPUCollate
 import multiprocessing as mp
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 log = logging.getLogger(__name__)
+
+def visualize_predictions(image,predictions,targets, title="", output_dir=None):
+    img_np = image.cpu().numpy()[0]  # 1 channel for grayscale
+    fig, ax = plt.subplots(1)
+    ax.imshow(img_np, cmap='gray')
+    
+    # Plot predicted boxes in red
+    if predictions is not None and len(predictions['boxes']) > 0:
+        for box, score in zip(predictions['boxes'], predictions['scores']):
+            x1, y1, x2, y2 = box.cpu().numpy()
+            rect = patches.Rectangle((x1, y1), x2-x1, y2-y1, linewidth=2, 
+                                  edgecolor='r', facecolor='none')
+            ax.add_patch(rect)
+            ax.text(x1, y1-5, f'{score:.2f}', color='red')
+    
+    # Plot ground truth boxes in green
+    if targets is not None and targets['boxes'].numel() > 0:
+        boxes = targets['boxes'].view(-1, 4)
+        for box in boxes:
+            x1, y1, x2, y2 = box.cpu().numpy()
+            rect = patches.Rectangle((x1, y1), x2-x1, y2-y1, linewidth=2, 
+                                  edgecolor='g', facecolor='none')
+            ax.add_patch(rect)
+    
+    plt.title(title)
+    plt.axis('off')
+    
+    # Save figure 
+    if output_dir:
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        save_path = output_dir / f"{title.replace(' ', '_')}.png"
+        plt.savefig(save_path)
+    plt.close()  
 
 def evaluate_model(model, data_loader, cfg: DictConfig):
     """
@@ -28,12 +65,23 @@ def evaluate_model(model, data_loader, cfg: DictConfig):
     total_predictions = 0
     total_boxes = 0
     
+    # save in visualizations directory
+    vis_dir = Path(cfg.logging.save_dir) / "visualizations"
+    
     with torch.no_grad():
         for batch_idx, (data, targets) in enumerate(tqdm(data_loader)):
             predictions = model(data)
-            log.info(f"pred scores: {predictions[0]['scores']}")
-            log.info(f"pred boxes: {predictions[0]['boxes']}")
-            log.info(f"pred labels: {predictions[0]['labels']}")
+            
+            # Visualize first n images
+            if batch_idx == 0:
+                for i in range(min(5, len(data))):
+                    visualize_predictions(
+                        data[i], 
+                        predictions[i],
+                        targets[i],
+                        title=f"Image {targets[i]['image_id']}",
+                        output_dir=vis_dir
+                    )
                         
             for pred, target in zip(predictions, targets):
                 image_id = target['image_id'].item()
@@ -60,11 +108,6 @@ def evaluate_model(model, data_loader, cfg: DictConfig):
                         }
                         for box, score in zip(boxes_coco, scores)
                     ])
-                    
-            if batch_idx == 0:  # Log detailed info for first batch
-                    log.info(f"First batch complete. Total boxes found: {total_boxes}")
-                    log.info(f"Results so far: {results}")
-   
     log.info(f"Evaluation complete. Total predictions: {total_predictions}")
     log.info(f"Total boxes detected: {total_boxes}")
     return results
@@ -87,12 +130,9 @@ def main(cfg: DictConfig):
     else:
         raise ValueError(f"Unknown model type: {cfg.model.name}")
  
-    checkpoint_path = "/root/ir-person-detector/multirun/2025-07-01/18-17-19/0/best_model.pth"
+    checkpoint_path = "/root/ir-person-detector/multirun/2025-07-01/22-21-57/11/best_model.pth"
     checkpoint = torch.load(checkpoint_path, map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
-    log.info(f"Loaded checkpoint from experiment: {checkpoint_path}")
-    
-    log.info(f"Model device: {next(model.parameters()).device}")
 
     test_transform = build_transforms(cfg, is_train=False, test=True)
 
@@ -122,7 +162,6 @@ def main(cfg: DictConfig):
 
     # COCO metrics
     gt_path = Path(cfg.dataset.data.test_annotations)
-    # Load and check contents
     with open(predictions_file, 'r') as f:
         pred_data = json.load(f)
     log.info(f"no of predictions: {len(pred_data)}")
@@ -136,22 +175,14 @@ def main(cfg: DictConfig):
     pred_img_ids = set(p['image_id'] for p in pred_data)
     gt_img_ids = set(ann['image_id'] for ann in gt_data['annotations'])
     matching_ids = pred_img_ids.intersection(gt_img_ids)
-    log.info(f"matching image IDs: {len(matching_ids)}")
 
     coco_gt = COCO(gt_path)
-    log.info(f"Categories in dataset: {coco_gt.loadCats(coco_gt.getCatIds())}")
     coco_dt = coco_gt.loadRes(str(predictions_file))
     
     coco_eval = COCOeval(cocoGt=coco_gt, cocoDt=coco_dt)
     coco_eval.params.catIds = [1]
     coco_eval.params.iouType = 'bbox'
-
-
-    # compare with your predictions for image 0
-    img0_preds = [p for p in results if p['image_id'] == 0]
-    log.info(f"Predictions for image 0: {img0_preds}")
     coco_eval.evaluate()
-    #log.info(f"evalImgs: {[x for x in coco_eval.evalImgs if x is not None]}")
     coco_eval.accumulate()
     coco_eval.summarize()
 
