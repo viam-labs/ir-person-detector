@@ -19,10 +19,11 @@ from utils.transforms import build_transforms, GPUCollate
 import multiprocessing as mp
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import random
 
 log = logging.getLogger(__name__)
 
-def visualize_predictions(image,predictions,targets, title="", output_dir=None):
+def visualize_predictions(image,predictions,targets,cfg: DictConfig, title="", output_dir=None):
     img_np = image.cpu().numpy()[0]  # 1 channel for grayscale
     fig, ax = plt.subplots(1)
     ax.imshow(img_np, cmap='gray')
@@ -31,10 +32,11 @@ def visualize_predictions(image,predictions,targets, title="", output_dir=None):
     if predictions is not None and len(predictions['boxes']) > 0:
         for box, score in zip(predictions['boxes'], predictions['scores']):
             x1, y1, x2, y2 = box.cpu().numpy()
-            rect = patches.Rectangle((x1, y1), x2-x1, y2-y1, linewidth=2, 
-                                  edgecolor='r', facecolor='none')
-            ax.add_patch(rect)
-            ax.text(x1, y1-5, f'{score:.2f}', color='red')
+            if score > cfg.evaluation.confidence_threshold:  # Only plot boxes with confidence > threshold
+                rect = patches.Rectangle((x1, y1), x2-x1, y2-y1, linewidth=2, 
+                                    edgecolor='r', facecolor='none')
+                ax.add_patch(rect)
+                ax.text(x1, y1-5, f'{score:.2f}', color='red')
     
     # Plot ground truth boxes in green
     if targets is not None and targets['boxes'].numel() > 0:
@@ -65,23 +67,34 @@ def evaluate_model(model, data_loader, cfg: DictConfig):
     total_predictions = 0
     total_boxes = 0
     
+    # Track confidence score statistics
+    all_scores = []
+    boxes_above_threshold = 0
+    boxes_below_threshold = 0
+
+    num_images_to_visualize = 7 
+    total_images = len(data_loader.dataset)
+    images_to_plot = set(random.sample(range(total_images), min(num_images_to_visualize, total_images)))
     # save in visualizations directory
     vis_dir = Path(cfg.logging.save_dir) / "visualizations"
     
     with torch.no_grad():
         for batch_idx, (data, targets) in enumerate(tqdm(data_loader)):
             predictions = model(data)
-            
-            # Visualize first n images
-            if batch_idx == 0:
-                for i in range(min(5, len(data))):
+        
+            # Visualize random sample of images
+            for i in range(len(data)):
+                global_image_idx = batch_idx * cfg.training.batch_size + i
+                if global_image_idx in images_to_plot:
                     visualize_predictions(
                         data[i], 
                         predictions[i],
                         targets[i],
+                        cfg=cfg,
+                        output_dir=vis_dir, 
                         title=f"Image {targets[i]['image_id']}",
-                        output_dir=vis_dir
                     )
+                    images_to_plot.remove(global_image_idx)  # avoid duplicates
                         
             for pred, target in zip(predictions, targets):
                 image_id = target['image_id'].item()
@@ -89,27 +102,44 @@ def evaluate_model(model, data_loader, cfg: DictConfig):
                 scores = pred['scores']
                 total_predictions += 1
                 total_boxes += len(boxes)
+                
+                # statistics about confidence scores for prediction boxes
+                if len(scores) > 0:
+                    all_scores.extend(scores.cpu().numpy())
+                    boxes_above_threshold += (scores > cfg.evaluation.confidence_threshold).sum().item()
+                    boxes_below_threshold += (scores <= cfg.evaluation.confidence_threshold).sum().item()
     
                 if len(boxes) > 0:
-                    # convert from [x1,y1,x2,y2] to COCO format [x,y,w,h]
-                    boxes_coco = torch.zeros_like(boxes)
-                    boxes_coco[:, 0] = boxes[:, 0]  # x
-                    boxes_coco[:, 1] = boxes[:, 1]  # y
-                    boxes_coco[:, 2] = boxes[:, 2] - boxes[:, 0]  # w
-                    boxes_coco[:, 3] = boxes[:, 3] - boxes[:, 1]  # h
+                    # Only include boxes with confidence > threshold
+                    mask = scores > cfg.evaluation.confidence_threshold
+                    boxes = boxes[mask]
+                    scores = scores[mask]
                     
-                    # Add all detections for this image
-                    results.extend([
-                        {
-                            'image_id': image_id,
-                            'category_id': 1,  # person
-                            'bbox': box.tolist(),
-                            'score': score.item()
-                        }
-                        for box, score in zip(boxes_coco, scores)
-                    ])
-    log.info(f"Evaluation complete. Total predictions: {total_predictions}")
+                    if len(boxes) > 0:  # Check if any boxes remain after filtering
+                        # convert from [x1,y1,x2,y2] to COCO format [x,y,w,h]
+                        boxes_coco = torch.zeros_like(boxes)
+                        boxes_coco[:, 0] = boxes[:, 0]  # x
+                        boxes_coco[:, 1] = boxes[:, 1]  # y
+                        boxes_coco[:, 2] = boxes[:, 2] - boxes[:, 0]  # w
+                        boxes_coco[:, 3] = boxes[:, 3] - boxes[:, 1]  # h
+                        
+                        # Add all detections for this image
+                        results.extend([
+                            {
+                                'image_id': image_id,
+                                'category_id': 1,  # person
+                                'bbox': box.tolist(),
+                                'score': score.item()
+                            }
+                            for box, score in zip(boxes_coco, scores)
+                        ])
+    
+    # Log confidence score statistics
+    all_scores = np.array(all_scores)
     log.info(f"Total boxes detected: {total_boxes}")
+    log.info(f"Boxes with confidence > {cfg.evaluation.confidence_threshold}: {boxes_above_threshold} ({boxes_above_threshold/total_boxes*100:.1f}%)")
+    log.info(f"Boxes with confidence <= {cfg.evaluation.confidence_threshold}: {boxes_below_threshold} ({boxes_below_threshold/total_boxes*100:.1f}%)")
+    
     return results
 
 @hydra.main(config_path="../configs", config_name="config", version_base=None)
@@ -130,7 +160,7 @@ def main(cfg: DictConfig):
     else:
         raise ValueError(f"Unknown model type: {cfg.model.name}")
  
-    checkpoint_path = "/root/ir-person-detector/multirun/2025-07-01/22-21-57/11/best_model.pth"
+    checkpoint_path = "/root/ir-person-detector/multirun/2025-07-25/18-38-38/19/best_model.pth"
     checkpoint = torch.load(checkpoint_path, map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
 
@@ -169,7 +199,7 @@ def main(cfg: DictConfig):
     with open(gt_path, 'r') as f:
         gt_data = json.load(f)
     log.info(f"ground truth images: {len(gt_data['images'])}")
-    log.info(f"ground truth annotations: {len(gt_data['annotations'])}")
+    log.info(f"ground truth annotations (to compare with predictions kept after confidence threshold filtering): {len(gt_data['annotations'])}")
 
     # Check if there are any matching image IDs
     pred_img_ids = set(p['image_id'] for p in pred_data)
@@ -199,6 +229,7 @@ def main(cfg: DictConfig):
     metrics_file = output_dir / f"{cfg.model.name}_metrics.json"
     with open(metrics_file, "w") as f:
         json.dump(metrics, f, indent=4)
+        json.dump(checkpoint_path, f, indent=4)
     
     log.info(f"AP50: {metrics['AP50']:.3f}")
 

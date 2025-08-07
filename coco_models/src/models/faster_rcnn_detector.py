@@ -1,7 +1,4 @@
-import torch
 import torch.nn as nn
-import torchvision
-from torchvision.models.detection import fasterrcnn_mobilenet_v3_large_fpn, FasterRCNN_MobileNet_V3_Large_FPN_Weights
 from torchvision.models.detection.faster_rcnn import FasterRCNN
 from omegaconf import DictConfig
 import logging
@@ -29,15 +26,14 @@ class FasterRCNNDetector(nn.Module):
             backbone= backbone_fpn,
             num_classes=cfg.model.num_classes +1,
             box_nms_thresh=0.5,     # NMS IoU threshold
-            box_detections_per_img=10,   # Lower the confidence threshold
         )
         
         input_h, input_w = cfg.model.transform.input_size
         self.model.transform = SingleChannelRCNNTransform(
             min_size= input_h, #can adjust 
             max_size=input_w,
-            image_mean=[0.485],
-            image_std=[0.229]
+            image_mean= cfg.model.transform.image_mean,
+            image_std= cfg.model.transform.image_std
         )
     
     def forward(self, data, targets=None):

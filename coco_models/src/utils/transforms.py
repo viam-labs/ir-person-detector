@@ -1,13 +1,12 @@
 import torch
-import torchvision.transforms as T
-import torchvision.transforms.functional as F
-from typing import Dict, List, Union, Tuple
+import torchvision.transforms.v2 as T
+import torchvision.transforms.v2.functional as F
+from typing import Dict, List, Tuple
 import torch.nn.functional as F_nn
 import math
 
 
 import logging
-
 log = logging.getLogger(__name__)
 
 class GPUCollate:
@@ -55,13 +54,17 @@ class DetectionTransform:
             if t['name'] == 'Resize':
                 self.transforms.append(('resize', t['params']['size']))
             elif t['name'] == 'Normalize':
-                self.transforms.append(('normalize', t['params']['mean'], t['params']['std']))
+               self.transforms.append(('normalize', t['params']['mean'], t['params']['std']))
             elif t['name'] == 'RandomHorizontalFlip':
                 self.transforms.append(('flip_h', t['params']['p']))
             elif t['name'] == 'RandomVerticalFlip':
                 self.transforms.append(('flip_v', t['params']['p']))
             elif t['name'] == 'RandomRotation':
-                self.transforms.append(('rotate', t['params']['degrees']))
+                self.transforms.append(('rotate', t['params']['degrees'], t['params']['p']))
+            elif t['name'] == 'ColorJitter':
+                self.transforms.append(('color_jitter', t['params']['brightness'], t['params']['contrast'], t['params']['p']))
+            elif t['name'] == 'RandomNoise':
+                self.transforms.append(('random_noise', t['params']['mean'], t['params']['std'], t['params']['p']))
     
     def to(self, device):
         self.device = device
@@ -104,10 +107,12 @@ class DetectionTransform:
             
             elif t_name == 'flip_h':
                 p = params[0]
+                #print mask to check they aren't always the same 
                 flip_mask = (torch.rand(images.shape[0], device=images.device) < p) #generating mask of booleans for whethr to flip or not
-                # Flip whole batch where mask is True
+                #log.info(f"flip_mask_h: {flip_mask}")
+                # Flip whole batch where mask is True (repeated logic for following transforms)
                 images[flip_mask] = F.hflip(images[flip_mask])
-                for i, flip_true in enumerate(flip_mask):
+                for i, flip_true in enumerate(flip_mask): #flip bounding boxes too 
                     if flip_true and 'boxes' in targets[i]:
                         boxes = targets[i]['boxes']
                         boxes[:, [0, 2]] = images.shape[-1] - boxes[:, [2, 0]]
@@ -115,7 +120,8 @@ class DetectionTransform:
 
             elif t_name == 'flip_v':
                 p = params[0]
-                flip_mask = (torch.rand(images.shape[0], device=images.device) < p) 
+                #flip_mask = (torch.rand(images.shape[0], device=images.device) < p) 
+                log.info(f"flip_mask_v: {flip_mask}")
                 images[flip_mask] = F.vflip(images[flip_mask])
                 for i, flip_true in enumerate(flip_mask):
                     if flip_true and 'boxes' in targets[i]:
@@ -125,13 +131,27 @@ class DetectionTransform:
                         targets[i]['boxes'] = boxes
             
             elif t_name == 'rotate':
-                degrees = params[0]
-                p = 0.3  # probability of applying rotation, could be made configurable
+                degrees, p = params
                 rotate_mask = (torch.rand(images.shape[0], device=images.device) < p)
                 # generate angles for images that will be rotated
                 angles = torch.zeros(images.shape[0], device=images.device)
                 angles[rotate_mask] = torch.empty(rotate_mask.sum(), device=images.device).uniform_(-degrees, degrees)
                 images, targets = rotate_batch(images, targets, angles)
+            
+            elif t_name == 'color_jitter':
+                brightness, contrast, p = params
+                color_jitter_mask = (torch.rand(images.shape[0], device=images.device) < p)
+                images[color_jitter_mask] = T.ColorJitter(brightness=brightness, contrast=contrast)(images[color_jitter_mask])
+            
+            elif t_name == 'random-noise':
+                mean, std, p = params
+                noise_mask = (torch.rand(images.shape[0], device=images.device) < p)
+                images[noise_mask] = T.GaussianNoise(mean=mean, sigma=std)(images[noise_mask])
+
+            elif t_name =='gamma':
+                gamma, p = params
+                gamma_mask = (torch.rand(images.shape[0], device=images.device) < p)
+                images[gamma_mask] = F.adjust_gamma(images[gamma_mask], gamma=gamma) #takes tensors as input
         
         return images, targets
     

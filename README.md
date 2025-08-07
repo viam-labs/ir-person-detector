@@ -83,6 +83,11 @@ Two datasets were used throughout training, to compare results and optimally tra
 1. [FLIR_ADAS dataset](https://adas-dataset-v2.flirconservator.com/#downloadguide)
 2. [IR_data](https://www.kaggle.com/datasets/sikdermdsaiful/thermal-images-for-human-detection)
 
+### **To get the dataset on your local device for training**
+
+Download the dataset from kaggle, and run utils/clean_dataset.py with the path to the train, validation and test splits to produce a cleaned annotation files with the correct corresponding labels. 
+
+Check the paths in datasets/ir_data.yaml to confirm that the paths to your image files and annotations are correct.
 
 ## **Training:**
 Experimental outputs are saved in /multirun, organized according to date and time of the experiment. Config files in configs/optimization_results are saved from using Optuna hyperparameter tuning while training, and these tuned parameters can be used to override default settings for optimized train and val losses. 
@@ -91,7 +96,7 @@ The device is configurd to CUDA GPU in the setup configs for both COCO and YOLO,
 ### **To run the training pipeline on a COCO model:**
 
 Run: 
-<pre> bash python src/coco_models/train.py --multirun model=model_name optimization_results=model_name dataset=ir_data
+<pre> bash python coco_models/src/train.py --multirun model=model_name optimization_results=model_name dataset=ir_data
 </pre>
 The model name and optimization_results options are custom_detector, effnet, ssdlite or faster_rcnn. The dataset options are ir_data or flir.
 
@@ -131,9 +136,21 @@ Outputs are saved in /outputs, with predictions.json and metrics.json which incl
     "APl"
 }
 
+#### **Visualization:**
+
+See outputs/visualizations folder. The first 5 processsed images will be saved, with ground truth boxes in green and prediction boxes in red, with annotated confidence scores. 
+
+**Tensorboard:**
+During training, loss values and other metrics are logged in tensorboard. To visualize them:
+
+1. Install with <pre> pip install tensorboard </pre>
+
+2. Launch a specific training run with <pre> tensorboard --logdir=path/to/tensorboard </pre>. Make sure to select "scalars" instead of "time series" data.
+
+Example path/to/tensorboard: "outputs/2025-07-08/20-31-07/tensorboard" (do not enter the path to the actual file, but the tensorboard folder instead)
+
+Tip: You can compare multiple runs by pointing --logdir to the parent directory containing several experiment folders.
+
 ### **For YOLO models:**
 Evaluation metrics are computed by the ultralytics package, including a results.csv file, confusion matrices, mAP, precision and recall metrics and train/val batch loss diagrams. These are all saved in yolo_models/experiments when the train script is executed.
 
-## Visualization 
-
-TODO: add to this section 

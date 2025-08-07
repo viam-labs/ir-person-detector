@@ -18,38 +18,55 @@ image:
 classes:
   - person
 
-transform: #including more augmentations to prevent overfitting 
+#hardcoded values are overriden by optuna sweeper
+transform: #including more augmentations to prevent overfitting, intensity and geometric transformations.
   train:
     - name: Resize
       params:
         size: ${model.transform.input_size}
     - name: RandomRotation
       params: 
-        degrees: 10 #${optimization_results.best_params.degrees} 
+        degrees: 10 
+        p: 0.3
         expand: false
     - name: RandomHorizontalFlip
       params:
-        p: 0.5 #${optimization_results.best_params.p_h} 
+        p: 0.5 
     - name: RandomVerticalFlip
       params:
-        p: 0.2 #${optimization_results.best_params.p_v} 
+        p: 0.2 
     - name: Normalize
       params:
-        mean: [0.485]
-        std: [0.229]
+        mean: [0.2618] #calculated from norm_values.py from 100 batches
+        std: [0.1905]
+    - name: ColorJitter
+      params:
+        brightness: 0.2 
+        contrast: 0.2
+        p: 0.5
+    - name: RandomGaussianNoise
+      params:
+        mean: 0.0
+        std: 0.1
+        p: 0.5
+    - name: RandomGamma
+      params: 
+        gamma: 1
+        p: 0.5
+
   val:
     - name: Resize
       params:
         size: ${model.transform.input_size}
     - name: Normalize
       params: 
-        mean: [0.485]
-        std: [0.229]
+        mean: [0.2618]
+        std: [0.1905]
   test:
     - name: Normalize
       params:
-        mean: [0.485]
-        std: [0.229]
+         mean: [0.2618]
+         std: [0.1905]
 
 # COCO specific settings
 coco:

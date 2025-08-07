@@ -4,26 +4,23 @@ from omegaconf import DictConfig, OmegaConf
 import torch
 from torch.utils.data import DataLoader
 import logging
-import torch.nn as nn
 from pathlib import Path
 from tqdm import tqdm
-from torchvision.ops import generalized_box_iou_loss
-import torch.nn.functional as F
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-
+from torchinfo import summary
 from models.custom_detector import ThermalDetector
 from models.faster_rcnn_detector import FasterRCNNDetector
 from models.effnet_detector import EfficientNetDetector
 from models.ssdlite_detector import SSDLiteDetector
-from datasets.flir_dataset import FLIRDataset
 from datasets.ir_dataset import IRDataset
 from utils.transforms import build_transforms, GPUCollate
 from torch.utils.tensorboard import SummaryWriter
 import torch.multiprocessing as mp
 import gc
-
+from omegaconf import OmegaConf
 log = logging.getLogger(__name__)
 
+OmegaConf.register_new_resolver("eval", eval)
 def train_model(model, train_loader, val_loader, optimizer, scheduler, device, cfg: DictConfig):
     # Create tensorboard writer using Hydra's output directory
     writer = SummaryWriter(Path(cfg.logging.save_dir) / 'tensorboard')  # Use Hydra's output directory
@@ -47,11 +44,12 @@ def train_model(model, train_loader, val_loader, optimizer, scheduler, device, c
 
             if cfg.model.name in ["faster_rcnn", "ssdlite"]: #for torchvision models: they return a Dict[Tensor] which contains classification and regression losses
                 loss_dict = model(data, targets)
-                loss = sum(loss_dict.values()) #sum of classification and regression losses
-            else:
-                outputs = model(data) #standard format for custom pytorch models 
-                loss_dict = compute_loss(outputs, targets)
-                loss = loss_dict['total_loss']
+                loss = (
+                loss_dict['loss_classifier'] * cfg.training.loss.cls_loss_weight +
+                loss_dict['loss_box_reg'] * cfg.training.loss.box_loss_weight +
+                loss_dict['loss_objectness'] * cfg.training.loss.rpn_loss_weight +
+                loss_dict['loss_rpn_box_reg'] * cfg.training.loss.rpn_box_reg_loss_weight
+            ) #sum of classification and regression losses according to weights 
 
             loss.backward()
             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0) # gradient clipping to avoid exploding gradients
@@ -73,8 +71,6 @@ def train_model(model, train_loader, val_loader, optimizer, scheduler, device, c
         # Choose validation function based on model type
         if cfg.model.name in ["faster_rcnn", "ssdlite"]:
             avg_val_loss = evaluate_validation(model, val_loader, device, epoch, cfg)
-        else:
-            avg_val_loss = evaluate_validation_custom(model, val_loader, device, epoch, cfg)
 
         scheduler.step(avg_val_loss)
 
@@ -136,49 +132,6 @@ def evaluate_validation(model, val_loader, device, epoch, cfg: DictConfig):
     
     return val_loss / len(val_loader)
 
-def evaluate_validation_custom(model, val_loader, device, epoch, cfg: DictConfig):
-    model.eval()
-    val_loss = 0.0
-    criterion = compute_loss
-    
-    with torch.no_grad():
-        val_pbar = tqdm(val_loader, desc=f'Epoch {epoch+1}/{cfg.training.num_epochs} [Val]')
-        for i, (data, targets) in enumerate(val_pbar):
-            outputs = model(data)
-            loss = criterion(outputs, targets)
-            val_loss += loss.item()
-            val_pbar.set_postfix({'val_loss': loss.item()})
-
-    return val_loss / len(val_loader)
-
-def compute_loss(predictions, targets): #only for custom detector since torchvision has build in loss funcs 
-    total_cls_loss = 0
-    total_box_loss = 0
-    batch_size = len(targets)
-    
-    for idx in range(batch_size):
-        # Classification loss (binary since there is only one class)
-        cls_loss = F.binary_cross_entropy_with_logits(
-            predictions['scores'][idx], 
-            targets[idx]['labels'].float()
-        )
-        
-        # loss using GIoU for bounding boxes 
-        box_loss = generalized_box_iou_loss(
-            predictions['boxes'][idx],
-            targets[idx]['boxes'],
-            reduction='mean'
-        )
-        
-        total_cls_loss += cls_loss
-        total_box_loss += box_loss
-    
-        return {
-        'classification_loss': total_cls_loss / batch_size,
-        'box_loss': total_box_loss / batch_size,
-        'total_loss': (total_cls_loss + total_box_loss) / batch_size
-    }
-
 @hydra.main(config_path="../configs", config_name="config", version_base=None)
 def main(cfg: DictConfig):
     # Set multiprocessing start method to 'spawn' for CUDA compatibility
@@ -204,11 +157,12 @@ def main(cfg: DictConfig):
     elif cfg.model.name == "ssdlite":
         model = SSDLiteDetector(cfg).to(device)
         log.info("ssdlite model created and moved to device")
+        summary(model, (32, 1, 320, 320))
     else:
         raise ValueError(f"Unknown model type: {cfg.model.name}")
    
 
-    train_transform = build_transforms(cfg, is_train=True, test=False)
+    train_transform = build_transforms(cfg, is_train=True, test=False) #investigate whether each image can be transformed differently
     val_transform = build_transforms(cfg, is_train=False, test=False)    
 
     train_dataset = IRDataset(
@@ -226,7 +180,7 @@ def main(cfg: DictConfig):
         train_dataset,
         batch_size=cfg.training.batch_size,
         shuffle=True,
-        num_workers=cfg.training.num_workers,
+        num_workers= cfg.training.num_workers,
         pin_memory=cfg.training.pin_memory,
         collate_fn=GPUCollate(device, train_transform) 
     )
@@ -235,17 +189,16 @@ def main(cfg: DictConfig):
         val_dataset,
         batch_size=cfg.training.batch_size,
         shuffle=False,
-        num_workers=cfg.training.num_workers,
+        num_workers= cfg.training.num_workers,
         pin_memory=cfg.training.pin_memory,
         collate_fn=GPUCollate(device, val_transform)
     )
     
     # Create optimizer
   
-    optimizer = torch.optim.SGD(
+    optimizer = torch.optim.Adam(
             model.parameters(),
             lr=cfg.training.learning_rate,
-            momentum=0.9,
             weight_decay=cfg.training.weight_decay
         )
     

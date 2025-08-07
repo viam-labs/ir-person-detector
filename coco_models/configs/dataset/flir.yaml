@@ -25,31 +25,46 @@ transform: #including more augmentations to prevent overfitting
         size: ${model.transform.input_size}
     - name: RandomRotation
       params: 
-        degrees: ${optimization_results.best_params.degrees} #10
+        degrees: 10 
+        p: 0.3
         expand: false
     - name: RandomHorizontalFlip
       params:
-        p: 0.5 #${optimization_results.best_params.p_h} #0.5
+        p: 0.5 
     - name: RandomVerticalFlip
       params:
-        p: 0.2 #${optimization_results.best_params.p_v} #0.5
+        p: 0.2 
     - name: Normalize
       params:
-        mean: [0.485]
-        std: [0.229]
+        mean: [0.2618] 
+        std: [0.1905]
+    - name: ColorJitter
+      params:
+        brightness: 0.2 
+        contrast: 0.2
+        p: 0.5
+    - name: RandomGaussianNoise
+      params:
+        mean: 0.0
+        std: 0.1
+        p: 0.5
+    - name: RandomGamma
+      params: 
+        gamma: 1
+        p: 0.5
   val:
     - name: Resize
       params:
         size: ${model.transform.input_size}
     - name: Normalize
-      params:
-        mean: [0.485]
-        std: [0.229]
+      params: 
+        mean: [0.4832]
+        std: [0.2524]
   test:
     - name: Normalize
       params:
-        mean: [0.485]
-        std: [0.229]
+         mean: [0.4832]
+         std: [0.2524]
 
 # COCO specific settings
 coco:

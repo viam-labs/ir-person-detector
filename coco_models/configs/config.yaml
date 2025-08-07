@@ -1,30 +1,25 @@
-hydra:
-  sweeper:
-    _target_: hydra_plugins.hydra_optuna_sweeper.optuna_sweeper.OptunaSweeper
-    sampler:
-      _target_: optuna.samplers.TPESampler
-      seed: 42
-    direction: minimize
-    study_name: thermal_person_detection
-    n_trials: 50
-    n_jobs: 1
-    params:
-      model: choice(custom_detector,effnet,faster_rcnn,ssdlite)
-      training.learning_rate: tag(log, interval(1e-6, 1e-3)) #log scale sampling 
-      training.weight_decay: tag(log, interval(1e-6, 1e-3))
-
-# hydra: #if not using optuna
+# hydra:
 #   sweeper:
+#     _target_: hydra_plugins.hydra_optuna_sweeper.optuna_sweeper.OptunaSweeper
+#     sampler:
+#       _target_: optuna.samplers.TPESampler
+#       seed: 42
+#     direction: minimize
+#     study_name: thermal_person_detection
+#     n_trials: 30
+#     n_jobs: 1
 #     params:
-#       model: choice(custom_detector,effnet,faster_rcnn,ssdlite)
-#       optimization_results: choice(faster_rcnn,ssdlite)
-#       dataset: choice(ir_data,flir)
+#       model: faster_rcnn
+#       training.learning_rate: tag(log, interval(1e-5, 5e-3)) #log scale sampling 
+#       training.weight_decay: tag(log, interval(1e-6, 1e-3))
+#       training.loss.cls_loss_weight: tag(uniform, interval(0.2, 0.8))
+#       training.loss.rpn_loss_weight: tag(uniform, interval(0.2, 0.8)) #labeled as "objectness" in tensorboard
     
 defaults:
   - model: faster_rcnn  
   - dataset: ir_data
-  #- optimization_results: faster_rcnn
-  - override hydra/sweeper: optuna #need for optuna!
+  - optimization_results: faster_rcnn # comment out if using optuna
+  #- override hydra/sweeper: optuna #need for optuna!
   - _self_
 
 # Experiment settings
@@ -37,13 +32,19 @@ experiment:
 training:
   batch_size: 32
   num_epochs: 25
-  learning_rate: 1e-4 # ${optimization_results.best_params.learning_rate} #1e-3
-  weight_decay: 1e-3 # ${optimization_results.best_params.weight_decay} #1e-3
-  early_stopping_patience: 15 # ${optimization_results.best_params.early_stopping_patience} #15
+  learning_rate: ${optimization_results.best_params.learning_rate} 
+  weight_decay: ${optimization_results.best_params.weight_decay} 
+  early_stopping_patience: 15 
   checkpoint_dir: checkpoints
-  num_workers: 2
+  num_workers: 1
   pin_memory: false
-  #drop_prob: 0.3  #${optimization_results.best_params.dropout}
+  loss:
+    cls_loss_weight: ${optimization_results.best_params.cls_loss_weight}
+    box_loss_weight: ${eval:1 - ${optimization_results.best_params.cls_loss_weight}}
+    rpn_loss_weight: ${optimization_results.best_params.rpn_loss_weight}
+    rpn_box_reg_loss_weight: ${eval:1 - ${optimization_results.best_params.rpn_loss_weight}}
 # Logging
 logging:
   save_dir: ${hydra:runtime.output_dir}
+evaluation:
+  confidence_threshold: 0.1
