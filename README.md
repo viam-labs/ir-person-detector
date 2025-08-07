@@ -44,6 +44,7 @@ coco_models/
     │   ├── flir_dataset.py
     │   ├── ir_dataset.py
     ├── eval.py
+    ├── norm_values.py
     ├── models
     │   ├── custom_detector.py
     │   ├── effnet_detector.py
