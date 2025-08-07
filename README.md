@@ -90,6 +90,7 @@ Download the dataset from kaggle, and run utils/clean_dataset.py with the path t
 
 Check the paths in datasets/ir_data.yaml to confirm that the paths to your image files and annotations are correct.
 
+
 ## **Training:**
 Experimental outputs are saved in /multirun, organized according to date and time of the experiment. Config files in configs/optimization_results are saved from using Optuna hyperparameter tuning while training, and these tuned parameters can be used to override default settings for optimized train and val losses. 
 The device is configurd to CUDA GPU in the setup configs for both COCO and YOLO, but can be changed to CPU if GPU is not available. 
@@ -136,7 +137,6 @@ Outputs are saved in /outputs, with predictions.json and metrics.json which incl
     "APm",
     "APl"
 }
-
 #### **Visualization:**
 
 See outputs/visualizations folder. The first 5 processsed images will be saved, with ground truth boxes in green and prediction boxes in red, with annotated confidence scores. 
