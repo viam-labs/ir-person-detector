@@ -205,3 +205,4 @@ FLIR_ADAS_v2/
 yolov8n.pt
 yolo11n.pt
 /yolo_models/
+/ir_data/

@@ -1,30 +1,63 @@
-import torch
 import torch.nn as nn
-import torchvision
-from torchvision.models.detection import fasterrcnn_mobilenet_v3_large_fpn, FasterRCNN_MobileNet_V3_Large_FPN_Weights
+from torchvision.models.detection.faster_rcnn import FasterRCNN
 from omegaconf import DictConfig
 import logging
+from torchvision.models.detection.transform import GeneralizedRCNNTransform
+from torchvision.models.detection.backbone_utils import BackboneWithFPN
+from torchvision.models.mobilenetv3 import mobilenet_v3_large
+
 log = logging.getLogger(__name__)
 #resizes to 800x1333 (will resize any image to this size)
 class FasterRCNNDetector(nn.Module):
     def __init__(self, cfg: DictConfig):
         super(FasterRCNNDetector, self).__init__()
         
+        backbone = mobilenet_v3_large(weights=None)
+        backbone.features[0][0] = replace_first_conv_to_1channel(backbone.features[0][0])
+
+        backbone_fpn = BackboneWithFPN(backbone.features,
+                                        return_layers={'4': '0', '6': '1', '12': '2', '16': '3'},  # typical MobileNetV3 FPN layers
+                                        in_channels_list=[40, 40, 112, 960],
+                                        out_channels=256)
+                                        
+        
         # Load pretrained model withOUT default weights
-        weights = FasterRCNN_MobileNet_V3_Large_FPN_Weights.DEFAULT
-        self.model = fasterrcnn_mobilenet_v3_large_fpn(
-            weights=None,
+        self.model = FasterRCNN(
+            backbone= backbone_fpn,
+            num_classes=cfg.model.num_classes +1,
             box_nms_thresh=0.5,     # NMS IoU threshold
-            box_detections_per_img=10  # Max detections per image
         )
         
-        # Modify classifier for single class detection
-        in_features = self.model.roi_heads.box_predictor.cls_score.in_features
-        self.model.roi_heads.box_predictor = (torchvision.models.detection.faster_rcnn.FastRCNNPredictor(
-            in_features, cfg.model.num_classes + 1))
-        
-        self.transforms = weights.transforms()
+        input_h, input_w = cfg.model.transform.input_size
+        self.model.transform = SingleChannelRCNNTransform(
+            min_size= input_h, #can adjust 
+            max_size=input_w,
+            image_mean= cfg.model.transform.image_mean,
+            image_std= cfg.model.transform.image_std
+        )
     
     def forward(self, data, targets=None):
         outputs = self.model(data, targets)
         return outputs
+
+class SingleChannelRCNNTransform(GeneralizedRCNNTransform):
+    def __init__(self, min_size, max_size, image_mean, image_std):
+        # Override mean and std for single channel
+        image_mean = [image_mean[0]]  
+        image_std = [image_std[0]]   
+        super().__init__(min_size, max_size, image_mean, image_std)
+
+def replace_first_conv_to_1channel(conv3: nn.Conv2d) -> nn.Conv2d:
+    new_conv = nn.Conv2d( #rebuilding first conv layer to accept 1 channel input 
+        in_channels=1,
+        out_channels=conv3.out_channels,
+        kernel_size=conv3.kernel_size,
+        stride=conv3.stride,
+        padding=conv3.padding,
+        bias=(conv3.bias is not None)
+    )
+    # Custom init
+    nn.init.kaiming_normal_(new_conv.weight, mode='fan_out', nonlinearity='relu') #fan out for preserving weight variance 
+    if new_conv.bias is not None:
+        nn.init.zeros_(new_conv.bias) #initializes bias to 0 as weights will be adjusted later
+    return new_conv

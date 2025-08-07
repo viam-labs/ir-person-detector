@@ -1,41 +1,50 @@
 import torch
-import torchvision.transforms as T
-import torchvision.transforms.functional as F
-from typing import Dict, List, Union, Tuple
+import torchvision.transforms.v2 as T
+import torchvision.transforms.v2.functional as F
+from typing import Dict, List, Tuple
 import torch.nn.functional as F_nn
 import math
 
-import logging
 
+import logging
 log = logging.getLogger(__name__)
 
-def custom_collate_fn(batch): #called in train.py
-    """
-    - images: Tensor[batch_size, C, H, W]
-    - targets: List[Dict] where each dict has:
-        - boxes: Tensor[N, 4]
-        - labels: Tensor[N] (all 1s for person class)
-        - image_id: Tensor[1] (single tensor for each image)
-    """
+class GPUCollate:
+    def __init__(self, device, transforms):
+        self.device = device
+        self.transforms = transforms.to(device) #moving transforms to GPU 
+        
+    def __call__(self, batch):
+        """
+        - images: Tensor[batch_size, C, H, W]
+        - targets: List[Dict] where each dict has:
+            - boxes: Tensor[N, 4]
+            - labels: Tensor[N] (all 1s for person class)
+            - image_id: Tensor[1] (single tensor for each image)
+        """
+        images = []
+        targets = []
+    
+        #for image, target in batch:
+        for i, (image, target) in enumerate(batch): #see if i can delete this 
+            images.append(image)
+            # Create target dict with single tensors (not lists)
+            target_dict = {
+                'boxes': target['boxes'],  # already a tensor from dataset
+                'labels': target['labels'],  # preserve labels from dataset
+                'image_id': target['image_id']  # already a tensor from dataset
+            }
+            targets.append(target_dict)
+    
+        # Stack images into a single tensor (they should all be the same size) and moving to device
+        images = torch.stack(images, dim=0).to(self.device)
 
-    images = []
-    targets = []
-    
-    #for image, target in batch:
-    for i, (image, target) in enumerate(batch):
-        images.append(image)
-        # Create target dict with single tensors (not lists)
-        target_dict = {
-            'boxes': target['boxes'],  # already a tensor from dataset
-            'labels': torch.ones(target['boxes'].shape[0], dtype=torch.int64),  # all 1s for person class
-            'image_id': target['image_id']  # already a tensor from dataset
-        }
-        targets.append(target_dict)
-    
-    # Stack images into a single tensor (they should all be the same size)
-    images = torch.stack(images, dim=0)
-    
-    return images, targets
+        targets = [{k: v.to(self.device) for k, v in t.items()} for t in targets] #moving targets to device
+        
+        # Apply transforms to images and targets
+        images, targets = self.transforms(images, targets)
+        
+        return images, targets
 
 class DetectionTransform:
     # transform that can be applied to images and bounding boxes
@@ -45,80 +54,106 @@ class DetectionTransform:
             if t['name'] == 'Resize':
                 self.transforms.append(('resize', t['params']['size']))
             elif t['name'] == 'Normalize':
-                self.transforms.append(('normalize', t['params']['mean'], t['params']['std']))
+               self.transforms.append(('normalize', t['params']['mean'], t['params']['std']))
             elif t['name'] == 'RandomHorizontalFlip':
                 self.transforms.append(('flip_h', t['params']['p']))
             elif t['name'] == 'RandomVerticalFlip':
                 self.transforms.append(('flip_v', t['params']['p']))
             elif t['name'] == 'RandomRotation':
-                self.transforms.append(('rotate', t['params']['degrees']))
+                self.transforms.append(('rotate', t['params']['degrees'], t['params']['p']))
+            elif t['name'] == 'ColorJitter':
+                self.transforms.append(('color_jitter', t['params']['brightness'], t['params']['contrast'], t['params']['p']))
+            elif t['name'] == 'RandomNoise':
+                self.transforms.append(('random_noise', t['params']['mean'], t['params']['std'], t['params']['p']))
     
-    def __call__(self, image, target):
+    def to(self, device):
+        self.device = device
+        return self
+
+    
+    def __call__(self, images, targets):
         #transforms to both image and bounding boxes
-        image = F.to_tensor(image) 
+        #images are already tensors when using GPUCollate
+        assert images.shape[1] == 1, "Expected single channel images"
+        assert len(images.shape) == 4, f"expected batched images [B,C,H,W], got shape {images.shape}"
         
-        # checking image has 1 channel
-        if image.shape[0] != 1:
-            raise ValueError(f"Expected 1 channel (thermal), got {image.shape[0]} channels")
-        
-       # image = image.repeat(3, 1, 1)  # Convert 1-channel to 3-channel (trial to see if this improves overfitting!!)
         for t_name, *params in self.transforms:
+
+            #images are batched tensors of [batch_size, C, H, W]
             if t_name == 'resize':
                 size = params[0]
                 # resize with padding
-                image, resize_info = resize_with_padding(image, size)
+                images, resize_info = resize_with_padding(images, size)
 
                 target_h, target_w = size
                 
                 # Transform boxes 
-                if target is not None and 'boxes' in target:
-                    boxes = target['boxes']
-                    boxes = transform_boxes(
-                        boxes,
-                        resize_info['scale'],
-                        resize_info['pad_left'],
-                        resize_info['pad_top'],
-                        target_w,
-                        target_h
-                    )
-                    target['boxes'] = boxes
+                for i in range(len(targets)):
+                    if targets[i]is not None and 'boxes' in targets[i]:
+                        boxes = targets[i]['boxes']
+                        boxes = transform_boxes(
+                            boxes,
+                            resize_info['scale'],
+                            resize_info['pad_left'],
+                            resize_info['pad_top'],
+                            target_w,
+                            target_h
+                        )
+                        targets[i]['boxes'] = boxes
 
             elif t_name == 'normalize':
                 mean, std = params
-                image = F.normalize(image, mean=mean, std=std)
+                images = F.normalize(images, mean=mean, std=std)
             
             elif t_name == 'flip_h':
                 p = params[0]
-                prob_h = torch.rand(1)
-                if torch.rand(1) < p:
-                    image = F.hflip(image)
-                    if target is not None and 'boxes' in target:
-                        boxes = target['boxes']
-                        # new_x = width - old_x
-                        boxes[:, [0, 2]] = image.shape[-1] - boxes[:, [2, 0]]
-                        target['boxes'] = boxes
-            
+                #print mask to check they aren't always the same 
+                flip_mask = (torch.rand(images.shape[0], device=images.device) < p) #generating mask of booleans for whethr to flip or not
+                #log.info(f"flip_mask_h: {flip_mask}")
+                # Flip whole batch where mask is True (repeated logic for following transforms)
+                images[flip_mask] = F.hflip(images[flip_mask])
+                for i, flip_true in enumerate(flip_mask): #flip bounding boxes too 
+                    if flip_true and 'boxes' in targets[i]:
+                        boxes = targets[i]['boxes']
+                        boxes[:, [0, 2]] = images.shape[-1] - boxes[:, [2, 0]]
+                        targets[i]['boxes'] = boxes
+
             elif t_name == 'flip_v':
                 p = params[0]
-                prob_v = torch.rand(1)
-                if torch.rand(1) < p:
-                    image = F.vflip(image)
-                    if target is not None and 'boxes' in target:
-                        boxes = target['boxes']
+                #flip_mask = (torch.rand(images.shape[0], device=images.device) < p) 
+                log.info(f"flip_mask_v: {flip_mask}")
+                images[flip_mask] = F.vflip(images[flip_mask])
+                for i, flip_true in enumerate(flip_mask):
+                    if flip_true and 'boxes' in targets[i]:
+                        boxes = targets[i]['boxes']
                         # new_y = height - old_y 
-                        boxes[:, [1, 3]] = image.shape[-2] - boxes[:, [3, 1]]
-                        target['boxes'] = boxes
+                        boxes[:, [1, 3]] = images.shape[-2] - boxes[:, [3, 1]]
+                        targets[i]['boxes'] = boxes
             
             elif t_name == 'rotate':
-                degrees= params[0]
-                prob_r = torch.rand(1)
-                if torch.rand(1) < 0.5:  # 50% chance to apply rotation
-                    angle = float(torch.empty(1).uniform_(-degrees, degrees).item())
-                    image, boxes = rotate_image_and_boxes(image, target['boxes'], angle, expand=False) if target is not None else (image, None)
-                    if boxes is not None:
-                        target['boxes'] = boxes
+                degrees, p = params
+                rotate_mask = (torch.rand(images.shape[0], device=images.device) < p)
+                # generate angles for images that will be rotated
+                angles = torch.zeros(images.shape[0], device=images.device)
+                angles[rotate_mask] = torch.empty(rotate_mask.sum(), device=images.device).uniform_(-degrees, degrees)
+                images, targets = rotate_batch(images, targets, angles)
+            
+            elif t_name == 'color_jitter':
+                brightness, contrast, p = params
+                color_jitter_mask = (torch.rand(images.shape[0], device=images.device) < p)
+                images[color_jitter_mask] = T.ColorJitter(brightness=brightness, contrast=contrast)(images[color_jitter_mask])
+            
+            elif t_name == 'random-noise':
+                mean, std, p = params
+                noise_mask = (torch.rand(images.shape[0], device=images.device) < p)
+                images[noise_mask] = T.GaussianNoise(mean=mean, sigma=std)(images[noise_mask])
+
+            elif t_name =='gamma':
+                gamma, p = params
+                gamma_mask = (torch.rand(images.shape[0], device=images.device) < p)
+                images[gamma_mask] = F.adjust_gamma(images[gamma_mask], gamma=gamma) #takes tensors as input
         
-        return image, target, prob_h, prob_v, prob_r
+        return images, targets
     
 def build_transforms(cfg: Dict, is_train: bool = True, test: bool = False) -> DetectionTransform:
     if is_train:
@@ -132,7 +167,7 @@ def build_transforms(cfg: Dict, is_train: bool = True, test: bool = False) -> De
 
 def resize_with_padding(image: torch.Tensor, target_size: Tuple[int, int]) -> Tuple[torch.Tensor, Dict[str, float]]:
    #maintain aspect ratio and add padding
-    c, h, w = image.shape
+    b, c, h, w = image.shape
     target_h, target_w = target_size
     
     # calc scaling factors (to find limiting facotr )
@@ -145,7 +180,7 @@ def resize_with_padding(image: torch.Tensor, target_size: Tuple[int, int]) -> Tu
     new_w = int(w * scale)
     
     # Resize image
-    resized_image = F_nn.interpolate(image.unsqueeze(0), size=(new_h, new_w), mode='bilinear', align_corners=False).squeeze(0) #using interpolate since they are already tensors (not PIL)
+    resized_image = F_nn.interpolate(image, size=(new_h, new_w), mode='bilinear', align_corners=False) #using interpolate since they are already tensors (not PIL)
     
     # padding
     pad_h = target_h - new_h
@@ -222,12 +257,8 @@ def points_to_boxes(points: torch.Tensor) -> torch.Tensor:
     max_coords, _ = torch.max(points, dim=1)
     return torch.cat([min_coords, max_coords], dim=1)
 
-def rotate_points(points: torch.Tensor, center: Tuple[float, float], angle: float) -> torch.Tensor:
+def rotate_points(points: torch.Tensor, center: Tuple[float, float], rotMatrix: torch.Tensor) -> torch.Tensor:
     #Rotate points around center by angle (in degrees)
-    angle_rad = math.radians(angle)
-    cos_theta = math.cos(angle_rad)
-    sin_theta = math.sin(angle_rad)
-    
     cx, cy = center
     points = points.clone()
     
@@ -235,11 +266,36 @@ def rotate_points(points: torch.Tensor, center: Tuple[float, float], angle: floa
     points[..., 0] -= cx
     points[..., 1] -= cy
     
-    x_prime = points[..., 0] * cos_theta - points[..., 1] * sin_theta #rotation matrix multiplication 
-    y_prime = points[..., 0] * sin_theta + points[..., 1] * cos_theta
+    x_prime = points[..., 0] * rotMatrix[0,0] + points[..., 1] * rotMatrix[1,0] #rotation matrix multiplication 
+    y_prime = points[..., 0] * rotMatrix[0,1] + points[..., 1] * rotMatrix[1,1]
     
     # Translate back
     points[..., 0] = x_prime + cx
     points[..., 1] = y_prime + cy
     
     return points
+
+def rotate_batch(images,targets,angles, expand=False):
+    # images: [B, C, H, W]
+    # angles: [B] tensor of different angles for each image
+    angles_rad = (angles * math.pi / 180)
+    # Batch rotation matrix
+    theta = torch.zeros(images.shape[0], 2, 3, device=images.device) #2x3 matrix required for affine_grid but final column remains empty as no translation is applied 
+    theta[:, 0, 0] = torch.cos(angles_rad)
+    theta[:, 0, 1] = -torch.sin(angles_rad)
+    theta[:, 1, 0] = torch.sin(angles_rad)
+    theta[:, 1, 1] = torch.cos(angles_rad)
+
+    grid = F_nn.affine_grid(theta, images.shape, align_corners=False)
+    rotated_images = F_nn.grid_sample(images, grid, align_corners=False)
+    
+    center = (images.shape[-1] / 2, images.shape[-2] / 2)
+    for i, angle in enumerate(angles):
+        if targets[i] is not None and 'boxes' in targets[i]:
+            boxes = targets[i]['boxes']
+            # Use your existing functions
+            points = boxes_to_points(boxes)
+            rotated_points = rotate_points(points, center, theta[i])  # Negative angle as per your current code
+            targets[i]['boxes'] = points_to_boxes(rotated_points)
+    
+    return rotated_images, targets

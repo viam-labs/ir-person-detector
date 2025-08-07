@@ -1,13 +1,13 @@
-name: flir
+name: ir_data
 
 # Dataset paths
 data:
-  train_annotations: FLIR_ADAS_v2/images_thermal_train/coco.json
-  train_images: FLIR_ADAS_v2/images_thermal_train
-  val_annotations: FLIR_ADAS_v2/images_thermal_val/coco.json
-  val_images: FLIR_ADAS_v2/images_thermal_val
-  test_annotations: FLIR_ADAS_v2/images_thermal_test/coco.json
-  test_images: FLIR_ADAS_v2/images_thermal_test
+  train_annotations: ir_data/train/cleaned_train_coco.json
+  train_images: ir_data/train/images
+  val_annotations: ir_data/val/cleaned_val_coco.json
+  val_images: ir_data/val/images
+  test_annotations: ir_data/test/cleaned_test_coco.json
+  test_images: ir_data/test/images
   names: ['person']
 
 # Image configuration
@@ -18,7 +18,8 @@ image:
 classes:
   - person
 
-transform: #including more augmentations to prevent overfitting 
+#hardcoded values are overriden by optuna sweeper
+transform: #including more augmentations to prevent overfitting, intensity and geometric transformations.
   train:
     - name: Resize
       params:
@@ -36,7 +37,7 @@ transform: #including more augmentations to prevent overfitting
         p: 0.2 
     - name: Normalize
       params:
-        mean: [0.2618] 
+        mean: [0.2618] #calculated from norm_values.py from 100 batches
         std: [0.1905]
     - name: ColorJitter
       params:
@@ -52,19 +53,20 @@ transform: #including more augmentations to prevent overfitting
       params: 
         gamma: 1
         p: 0.5
+
   val:
     - name: Resize
       params:
         size: ${model.transform.input_size}
     - name: Normalize
       params: 
-        mean: [0.4832]
-        std: [0.2524]
+        mean: [0.2618]
+        std: [0.1905]
   test:
     - name: Normalize
       params:
-         mean: [0.4832]
-         std: [0.2524]
+         mean: [0.2618]
+         std: [0.1905]
 
 # COCO specific settings
 coco:

@@ -9,5 +9,5 @@ ssd_weights = SSDLite320_MobileNet_V3_Large_Weights.DEFAULT
 ssd_model = ssdlite320_mobilenet_v3_large(weights=None)
 
 batch_size = 64
-summary(rcnn_model, input_size=(batch_size, 1, 1000, 800))
+summary(rcnn_model, input_size=(batch_size, 1, 1024, 800))
 summary(ssd_model, input_size=(batch_size, 1, 320, 320))

@@ -3,20 +3,21 @@ from torch.utils.data import Dataset
 from pathlib import Path
 import json
 from PIL import Image
-import torchvision.transforms.functional as F
 import torch.nn as nn
 import logging
+import torchvision.transforms.functional as F
 log = logging.getLogger(__name__)
-class FLIRDataset(Dataset):
-    def __init__(self, json_file, thermal_dir, transform=None):
+class IRDataset(Dataset):
+    def __init__(self, json_file, thermal_dir):
         self.thermal_dir = Path(thermal_dir)
-        self.transform = transform
         log.info(f"thermal_dir: {self.thermal_dir}")
         
         # Load annotations
         with open(json_file, 'r') as f:
             data = json.load(f)
-        
+                
+        self.images = data['images']
+        self.annotations = data['annotations']
         # Create image_id to annotations mapping
         self.annotations = {}
         for ann in data['annotations']:
@@ -24,15 +25,12 @@ class FLIRDataset(Dataset):
             if img_id not in self.annotations:
                 self.annotations[img_id] = []
             self.annotations[img_id].append(ann)
-        
-        # Keep only images that have annotations
-        self.images = [img for img in data['images'] if img['id'] in self.annotations]
-    
+            
     def __len__(self):
         return len(self.images)
     
     def __getitem__(self, idx):
-           # Load image
+        # Load image
         img_info = self.images[idx]
         img_path = self.thermal_dir / img_info['file_name']
         if not img_path.exists():

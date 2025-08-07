@@ -8,8 +8,8 @@ model:
   pretrained: true
   num_classes: 1  
   img_size: 640
-  batch_size: 16
-  epochs: 50
+  batch_size: 64
+  epochs: 25
   device: cuda
   input_channels: 1  # Grayscale
   output_size: 5  # 4 for bbox + 1 for class
